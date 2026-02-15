@@ -82,3 +82,45 @@ export interface DiffStats {
 
 // Re-export resume variant types
 export type { ResumeVariant, Application, VariantStats } from "./resume-variants.js";
+
+/* ── Auto-Apply Types ── */
+
+export interface GreenhouseQuestionField {
+  name: string;
+  type: "input_text" | "textarea" | "input_file" | "multi_value_single_select" | "multi_value_multi_select";
+  values: Array<{ label: string; value: number | string }>;
+}
+
+export interface GreenhouseQuestion {
+  label: string;
+  description: string | null;
+  required: boolean;
+  fields: GreenhouseQuestionField[];
+}
+
+export interface GreenhouseJobDetail extends GreenhouseJob {
+  content: string;
+  company_name: string;
+  questions?: GreenhouseQuestion[];
+  data_compliance?: Array<{ type: string; requires_consent: boolean; retention_period: number | null }>;
+}
+
+export interface ApplicationResult {
+  success: boolean;
+  jobId: number;
+  boardToken: string;
+  companyName: string;
+  jobTitle: string;
+  jobUrl: string;
+  status: number;
+  message: string;
+  timestamp: string;
+}
+
+export interface JobMatch {
+  job: GreenhouseJob;
+  boardToken: string;
+  companyName: string;
+  score: number;
+  matchReasons: string[];
+}
