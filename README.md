@@ -1,35 +1,14 @@
-# Quant Job Tracker — Notification Service
+# Batch Application/Notification Syncs 
 
-Scrapes Greenhouse job boards for 20 quant firms every 6 hours, diffs against Redis state, and sends Slack notifications for new/removed postings.
+This service scrapes Greenhouse job boards, sends notifications, and auto-applies on net-new openings after applying existing filter critera. 
+
+A redis key-value cache is used to store job level uniqueness. Syncs need to be initially setup against job-board endpoints, job board discovery can be implemented via a seperate service.
 
 ## Tracked Companies
 
-See [`src/config/companies.ts`](src/config/companies.ts) for the full list. Currently tracking:
+Synced boards: [`src/config/companies.ts`](src/config/companies.ts) 
 
-| Company | Board Token | Type |
-|---------|------------|------|
-| Clear Street | `clearstreet` | Prime brokerage |
-| Aquatic Capital | `aquaticcapitalmanagement` | Quant hedge fund |
-| Graviton Research | `gravitonresearchcapital` | Quant trading |
-| Hudson River Trading | `hudsonrivertrading` | HFT |
-| Jane Street | `janestreet` | Quant trading |
-| Two Sigma | `twosigma` | Quant hedge fund |
-| Citadel Securities | `citabortsecurities` | Market maker |
-| DRW | `drweng` | Trading firm |
-| Old Mission Capital | `oldmissioncapital` | Market maker |
-| IMC Trading | `imc` | Market maker |
-| Jump Trading | `jumptrading` | HFT |
-| Point72 | `point72` | Hedge fund |
-| D.E. Shaw | `deshaw` | Quant hedge fund |
-| Susquehanna (SIG) | `sig` | Quant trading |
-| Wolverine Trading | `wolverine` | Options market maker |
-| Voleon | `voleon` | ML hedge fund |
-| Radix Trading | `radixtrading` | Quant trading |
-| Belvedere Trading | `belaboredmoose` | Options trading |
-| AQR Capital | `aqr` | Quant asset manager |
-| Millennium | `millenniumadvisors` | Multi-strat hedge fund |
-
-Each board is fetched via `https://boards-api.greenhouse.io/v1/boards/{token}/jobs`.
+Greenhouse end-point: `https://boards-api.greenhouse.io/v1/boards/{token}/jobs`
 
 ## Setup
 
@@ -37,7 +16,9 @@ Each board is fetched via `https://boards-api.greenhouse.io/v1/boards/{token}/jo
 npm install
 ```
 
-### Environment Variables (set in Netlify UI)
+### Environment Variables 
+
+Netlify UI is used to manage secrets but any key-value store will work
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -52,16 +33,28 @@ npm install
 - `GET /api/companies` — Lists all tracked companies and their Greenhouse URLs
 - `GET /api/status` — Shows last fetch time and job counts per company
 
-## How It Works
+## Flow
 
-1. **Scheduled trigger** (`fetch-jobs`) runs every 6 hours via cron
-2. It fires a POST to the **background worker** (`fetch-jobs-worker-background`) which has a 15-minute timeout
-3. The worker fetches each company's Greenhouse board, diffs against Redis, and updates indexes
+1. **Scheduled trigger** (`fetch-jobs`) runs every x hours via cron
+2. Fires a POST to the **background worker** (`fetch-jobs-worker-background`) on a 15-minute timeout
+3. The worker fetches each company's Greenhouse board, diffs against Redis, and updates existing indexes (data here is used by application agents)
 4. New/removed jobs are collected and sent as a Slack digest via webhook
 
-## Forking
+## Forking Deployment
 
 1. Fork this repo
 2. Edit `src/config/companies.ts` to track different companies
-3. Deploy to your own Netlify site
+3. Deploy to Netlify site
 4. Set the environment variables above in Netlify UI
+
+## Monitoring
+
+Healthy - 
+
+<img width="657" height="599" alt="ops" src="https://github.com/user-attachments/assets/7387ebc0-222e-4616-831b-219bf646c3d8" />
+
+* Email- jasonzb@umich.edu - gh auth
+* Port - redis-17054.c99.us-east-1-4.ec2.cloud.redislabs.com:17054
+
+
+
