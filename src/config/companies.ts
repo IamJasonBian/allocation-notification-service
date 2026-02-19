@@ -18,6 +18,7 @@ export interface Company {
 }
 
 export const companies: Company[] = [
+  // ── Quant / Trading ──
   { boardToken: "clearstreet",              displayName: "Clear Street",         description: "Prime brokerage, risk, trading systems" },
   { boardToken: "aquaticcapitalmanagement", displayName: "Aquatic Capital",      description: "Quant hedge fund" },
   { boardToken: "gravitonresearchcapital",  displayName: "Graviton Research",    description: "Quant trading" },
@@ -38,4 +39,21 @@ export const companies: Company[] = [
   { boardToken: "belaboredmoose",           displayName: "Belvedere Trading",    description: "Options trading" },
   { boardToken: "aqr",                      displayName: "AQR Capital",          description: "Quant asset manager" },
   { boardToken: "millenniumadvisors",       displayName: "Millennium",           description: "Multi-strat hedge fund" },
+
+  // ── Tech Startups / Scale-ups ──
+  { boardToken: "stripe",                   displayName: "Stripe",               description: "Payments infrastructure" },
+  { boardToken: "databricks",               displayName: "Databricks",           description: "Data + AI platform" },
+  { boardToken: "figma",                    displayName: "Figma",                description: "Design tools" },
+  { boardToken: "anthropic",                displayName: "Anthropic",            description: "AI safety and research" },
+  { boardToken: "scaleai",                  displayName: "Scale AI",             description: "Data labeling + AI infra" },
+  { boardToken: "datadog",                  displayName: "Datadog",              description: "Observability platform" },
+  { boardToken: "coinbase",                 displayName: "Coinbase",             description: "Crypto exchange" },
+  { boardToken: "discord",                  displayName: "Discord",              description: "Communication platform" },
+  { boardToken: "instacart",                displayName: "Instacart",            description: "Grocery delivery" },
+  { boardToken: "airtable",                 displayName: "Airtable",             description: "No-code database platform" },
+  { boardToken: "vercel",                   displayName: "Vercel",               description: "Frontend cloud platform" },
+  { boardToken: "brex",                     displayName: "Brex",                 description: "Corporate cards + spend mgmt" },
+  { boardToken: "gusto",                    displayName: "Gusto",                description: "Payroll + HR platform" },
+  { boardToken: "coreweave",                displayName: "CoreWeave",            description: "GPU cloud provider" },
+  { boardToken: "runwayml",                 displayName: "Runway",               description: "AI-powered creative tools" },
 ];
