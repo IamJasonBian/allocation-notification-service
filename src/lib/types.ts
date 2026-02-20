@@ -124,3 +124,20 @@ export interface JobMatch {
   score: number;
   matchReasons: string[];
 }
+
+export interface ApplicationStateRecord {
+  metadata: {
+    boardToken: string;
+    jobId: number | string;
+    companyName: string;
+    candidateEmail: string;
+    timestamp: string;
+    success: boolean;
+    message: string;
+    securityCodeUsed?: string;
+    finalUrl?: string;
+    stepReached: "submitted" | "security_code_entered" | "confirmed" | "failed";
+  };
+  fieldValues: Record<string, string>;
+  screenshotKeys: string[];
+}
