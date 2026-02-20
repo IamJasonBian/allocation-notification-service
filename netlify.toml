@@ -36,3 +36,13 @@
   from = "/api/check-email"
   to = "/.netlify/functions/check-email"
   status = 200
+
+[[redirects]]
+  from = "/api/applications"
+  to = "/.netlify/functions/applications"
+  status = 200
+
+[[redirects]]
+  from = "/api/bot-status"
+  to = "/.netlify/functions/bot-status"
+  status = 200
