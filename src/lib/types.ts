@@ -79,3 +79,6 @@ export interface DiffStats {
   removedCount: number;
   unchangedCount: number;
 }
+
+// Re-export resume variant types
+export type { ResumeVariant, Application, VariantStats } from "./resume-variants.js";
