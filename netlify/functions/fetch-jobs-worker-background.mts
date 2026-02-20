@@ -1,6 +1,6 @@
 import { companies } from "../../src/config/companies.js";
 import { getRedisClient, disconnectRedis } from "../../src/lib/redis.js";
-import { fetchGreenhouseJobs } from "../../src/lib/greenhouse.js";
+import { fetchJobs } from "../../src/lib/job-fetcher.js";
 import { diffAndUpdate } from "../../src/lib/differ.js";
 import { sendNotificationDigest } from "../../src/lib/notifier.js";
 import type { JobNotification } from "../../src/lib/types.js";
@@ -29,9 +29,10 @@ export default async (req: Request) => {
     console.log("Redis connected");
 
     for (const company of companies) {
-      console.log(`Processing ${company.displayName} (${company.boardToken})...`);
+      const atsType = company.atsType || "greenhouse";
+      console.log(`Processing ${company.displayName} (${company.boardToken}, ${atsType})...`);
 
-      const apiJobs = await fetchGreenhouseJobs(company.boardToken);
+      const apiJobs = await fetchJobs(company);
       if (apiJobs.length === 0) {
         console.log(`  No jobs returned for ${company.boardToken}, skipping`);
         continue;
@@ -42,7 +43,7 @@ export default async (req: Request) => {
 
       console.log(`  ${company.boardToken}: new=${stats.newCount} updated=${stats.updatedCount} removed=${stats.removedCount} unchanged=${stats.unchangedCount}`);
 
-      // Be polite to Greenhouse API
+      // Be polite to ATS APIs
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 

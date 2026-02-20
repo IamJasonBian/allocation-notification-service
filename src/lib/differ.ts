@@ -1,6 +1,6 @@
 import type Redis from "ioredis";
 import type { Company } from "../config/companies.js";
-import type { GreenhouseJob, JobNotification, DiffStats } from "./types.js";
+import type { UnifiedJob, JobNotification, DiffStats } from "./types.js";
 import { normalizeLocation, normalizeDepartment } from "./normalize.js";
 import { extractTags } from "./tags.js";
 import { createHash } from "crypto";
@@ -17,7 +17,7 @@ function contentHash(title: string, location: string, dept: string): string {
 export async function diffAndUpdate(
   r: Redis,
   company: Company,
-  apiJobs: GreenhouseJob[],
+  apiJobs: UnifiedJob[],
 ): Promise<{ stats: DiffStats; notifications: JobNotification[] }> {
   const { boardToken, displayName } = company;
   const now = new Date();
@@ -30,15 +30,15 @@ export async function diffAndUpdate(
   const pipe = r.pipeline();
 
   for (const job of apiJobs) {
-    const jobId = String(job.id);
+    const jobId = job.id;
     const compositeKey = `${boardToken}:${jobId}`;
     const hashKey = `jobs:${boardToken}:${jobId}`;
     apiJobIds.add(compositeKey);
 
     const title = job.title;
-    const url = job.absolute_url;
-    const locationRaw = job.location?.name || "Unknown";
-    const dept = job.departments?.[0]?.name || "General";
+    const url = job.url;
+    const locationRaw = job.location;
+    const dept = job.department;
     const updated = job.updated_at || nowIso;
 
     const hash = contentHash(title, locationRaw, dept);
