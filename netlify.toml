@@ -76,3 +76,13 @@
   from = "/api/crawler/crawls"
   to = "/.netlify/functions/crawler-crawls"
   status = 200
+
+[[redirects]]
+  from = "/api/jobs"
+  to = "/.netlify/functions/jobs"
+  status = 200
+
+[[redirects]]
+  from = "/api/categories"
+  to = "/.netlify/functions/categories"
+  status = 200

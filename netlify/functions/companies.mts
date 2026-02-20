@@ -10,12 +10,22 @@ function careerPageUrl(boardToken: string, atsType: string): string {
   }
 }
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+};
+
 /**
  * GET /api/companies
  * Returns all tracked companies with their ATS URLs.
  * Excludes companies in the `meta:removed_companies` Redis set.
  */
 export default async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("", { status: 200, headers: CORS_HEADERS });
+  }
+
   const redis = getRedisClient();
 
   try {
@@ -39,7 +49,7 @@ export default async (req: Request) => {
       JSON.stringify({ count: companyList.length, companies: companyList }, null, 2),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       },
     );
   } finally {
