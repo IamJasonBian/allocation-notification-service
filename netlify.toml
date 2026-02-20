@@ -11,3 +11,13 @@
   from = "/api/status"
   to = "/.netlify/functions/status"
   status = 200
+
+[[redirects]]
+  from = "/api/jobs"
+  to = "/.netlify/functions/jobs"
+  status = 200
+
+[[redirects]]
+  from = "/api/categories"
+  to = "/.netlify/functions/categories"
+  status = 200

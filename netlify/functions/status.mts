@@ -2,11 +2,21 @@ import type { Config } from "@netlify/functions";
 import { companies } from "../../src/config/companies.js";
 import { getRedisClient, disconnectRedis } from "../../src/lib/redis.js";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+};
+
 /**
  * GET /api/status
  * Returns last fetch times and job counts for each tracked company.
  */
 export default async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("", { status: 200, headers: CORS_HEADERS });
+  }
+
   const redis = getRedisClient();
 
   try {
@@ -28,7 +38,7 @@ export default async (req: Request) => {
 
     return new Response(JSON.stringify({ statuses }, null, 2), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
   } finally {
     await disconnectRedis();

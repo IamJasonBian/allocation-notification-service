@@ -1,11 +1,21 @@
 import type { Config } from "@netlify/functions";
 import { companies } from "../../src/config/companies.js";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+};
+
 /**
  * GET /api/companies
  * Returns all tracked companies with their Greenhouse URLs.
  */
 export default async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("", { status: 200, headers: CORS_HEADERS });
+  }
+
   const companyList = companies.map((c) => ({
     boardToken: c.boardToken,
     displayName: c.displayName,
@@ -18,7 +28,7 @@ export default async (req: Request) => {
     JSON.stringify({ count: companyList.length, companies: companyList }, null, 2),
     {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     },
   );
 };
