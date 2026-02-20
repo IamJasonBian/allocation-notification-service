@@ -1,0 +1,23 @@
+name: Fetch Jobs
+
+on:
+  schedule:
+    # Run every 6 hours at minute 0
+    - cron: '0 */6 * * *'
+  workflow_dispatch:  # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  fetch-jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Netlify Background Function
+        run: |
+          curl -X POST \
+            -H "x-webhook-secret: ${{ secrets.INTERNAL_WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail \
+            --max-time 30 \
+            https://${{ secrets.NETLIFY_SITE_URL }}/.netlify/functions/fetch-jobs-worker-background
+
+      - name: Check if function triggered successfully
+        run: echo "Job fetch triggered at $(date)"

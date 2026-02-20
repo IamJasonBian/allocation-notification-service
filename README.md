@@ -1,14 +1,24 @@
-# Batch Application/Notification Syncs 
+# Job Notification Service
 
-This service scrapes Greenhouse job boards, sends notifications, and auto-applies on net-new openings after applying existing filter critera. 
+A serverless job tracking system that monitors startup job postings across **multiple ATS platforms** (Greenhouse, Lever, Ashby) and sends notifications when jobs are added or removed.
 
-A redis key-value cache is used to store job level uniqueness. Syncs need to be initially setup against job-board endpoints, job board discovery can be implemented via a seperate service.
+**Now tracking 22 high-growth startups** including OpenAI, Anthropic, Notion, Stripe, Ramp, and more!
 
 ## Tracked Companies
 
-Synced boards: [`src/config/companies.ts`](src/config/companies.ts) 
+**Full list:** [`src/config/companies.ts`](src/config/companies.ts)
 
-Greenhouse end-point: `https://boards-api.greenhouse.io/v1/boards/{token}/jobs`
+### Multi-ATS Support
+- **Greenhouse**: `https://boards-api.greenhouse.io/v1/boards/{token}/jobs`
+- **Lever**: `https://api.lever.co/v0/postings/{token}`
+- **Ashby**: `https://api.ashbyhq.com/posting-api/job-board/{token}`
+
+### Current Companies (22 total)
+- **AI**: OpenAI, Anthropic
+- **Productivity**: Notion, Figma, Linear, Ashby
+- **Fintech**: Stripe, Ramp
+- **Infrastructure**: Perplexity, Deel
+- **Tech Scale-ups**: Databricks, Scale AI, Datadog, Coinbase, Discord, Instacart, Airtable, Vercel, Brex, Gusto, CoreWeave, Runway
 
 ## Setup
 
