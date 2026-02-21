@@ -46,3 +46,18 @@
   from = "/api/bot-status"
   to = "/.netlify/functions/bot-status"
   status = 200
+
+[[redirects]]
+  from = "/api/new-jobs"
+  to = "/.netlify/functions/new-jobs"
+  status = 200
+
+[[redirects]]
+  from = "/api/redis-debug"
+  to = "/.netlify/functions/redis-debug"
+  status = 200
+
+[[redirects]]
+  from = "/api/jobs/search"
+  to = "/.netlify/functions/jobs-search"
+  status = 200
