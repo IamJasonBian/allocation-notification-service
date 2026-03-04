@@ -16,11 +16,6 @@ import type { JobNotification } from "../../src/lib/types.js";
  * 4. Sends SMS digest of new/removed jobs
  */
 export default async (req: Request) => {
-  const secret = req.headers.get("x-webhook-secret");
-  if (secret !== (process.env.INTERNAL_WEBHOOK_SECRET || "")) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
   const redis = getRedisClient();
   const allNotifications: JobNotification[] = [];
 

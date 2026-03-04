@@ -6,14 +6,12 @@ import type { Config } from "@netlify/functions";
  */
 export default async (req: Request) => {
   const siteUrl = process.env.URL || "http://localhost:8888";
-  const secret = process.env.INTERNAL_WEBHOOK_SECRET || "";
 
   try {
     await fetch(`${siteUrl}/.netlify/functions/fetch-jobs-worker-background`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-webhook-secret": secret,
       },
       body: JSON.stringify({ triggered_at: new Date().toISOString() }),
     });

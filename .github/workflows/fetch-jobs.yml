@@ -13,11 +13,10 @@ jobs:
       - name: Trigger Netlify Background Function
         run: |
           curl -X POST \
-            -H "x-webhook-secret: ${{ secrets.INTERNAL_WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
             --fail \
             --max-time 30 \
-            https://${{ secrets.NETLIFY_SITE_URL }}/.netlify/functions/fetch-jobs-worker-background
+            https://route-agent.netlify.app/.netlify/functions/fetch-jobs-worker-background
 
       - name: Check if function triggered successfully
         run: echo "Job fetch triggered at $(date)"
