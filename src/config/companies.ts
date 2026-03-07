@@ -40,7 +40,6 @@ export const companies: Company[] = [
   { boardToken: "ramp",        displayName: "Ramp",         description: "Corporate cards & spend management", atsType: "ashby" },
 
   // ── Infrastructure & DevTools (Ashby) ──
-  { boardToken: "perplexity",  displayName: "Perplexity",   description: "AI-powered search engine", atsType: "ashby" },
   { boardToken: "deel",        displayName: "Deel",         description: "Global payroll & compliance", atsType: "ashby" },
 
   // ── Tech Startups / Scale-ups (Greenhouse) ──
@@ -57,9 +56,26 @@ export const companies: Company[] = [
   { boardToken: "coreweave",                displayName: "CoreWeave",            description: "GPU cloud provider" },
   { boardToken: "runwayml",                 displayName: "Runway",               description: "AI-powered creative tools" },
 
+  // ── Buy Side: PE / Growth Equity / Hedge Funds (Greenhouse) ──
+  { boardToken: "point72",                  displayName: "Point72",              description: "Multi-strategy hedge fund, equity research" },
+  { boardToken: "generalatlantic",          displayName: "General Atlantic",     description: "Growth equity PE" },
+  { boardToken: "gcmgrosvenor",             displayName: "GCM Grosvenor",        description: "Alternative asset management" },
+  { boardToken: "vikingglobalinvestors",    displayName: "Viking Global",        description: "PE / long-short equity hedge fund" },
+  { boardToken: "a16z",                     displayName: "Andreessen Horowitz",  description: "Venture capital / growth equity" },
+  { boardToken: "mangroup",                 displayName: "Man Group",            description: "Quantitative hedge fund / asset manager" },
+  { boardToken: "clearstreet",              displayName: "Clear Street",         description: "Prime brokerage, risk, trading systems" },
+  { boardToken: "towerresearchcapital",     displayName: "Tower Research",       description: "Quantitative trading firm" },
+  { boardToken: "gtcr",                     displayName: "GTCR",                description: "Middle-market PE, $35B+ AUM" },
+
+  // ── Sell Side: Equity Research / Investment Banking (Greenhouse) ──
+  { boardToken: "williamblair",             displayName: "William Blair",        description: "Equity research + investment banking" },
+
+  // ── Sell Side: Equity Research / Investment Banking (Lever) ──
+  { boardToken: "seaportglobal",  displayName: "Seaport Global",   description: "Equity research, capital markets", atsType: "lever" },
+  { boardToken: "aerispartners.com", displayName: "Aeris Partners", description: "Tech M&A investment banking", atsType: "lever" },
+
   // ── Quant / Trading (Greenhouse) ──
   // Uncomment to enable quant/finance tracking:
-  // { boardToken: "clearstreet",              displayName: "Clear Street",         description: "Prime brokerage, risk, trading systems" },
   // { boardToken: "aquaticcapitalmanagement", displayName: "Aquatic Capital",      description: "Quant hedge fund" },
   // { boardToken: "gravitonresearchcapital",  displayName: "Graviton Research",    description: "Quant trading" },
   // { boardToken: "hudsonrivertrading",       displayName: "Hudson River Trading", description: "HFT" },
@@ -70,7 +86,6 @@ export const companies: Company[] = [
   // { boardToken: "oldmissioncapital",        displayName: "Old Mission Capital",  description: "Market maker" },
   // { boardToken: "imc",                      displayName: "IMC Trading",          description: "Market maker" },
   // { boardToken: "jumptrading",              displayName: "Jump Trading",         description: "HFT" },
-  // { boardToken: "point72",                  displayName: "Point72",              description: "Hedge fund" },
   // { boardToken: "deshaw",                   displayName: "D.E. Shaw",            description: "Quant hedge fund" },
   // { boardToken: "sig",                      displayName: "Susquehanna (SIG)",    description: "Quant trading" },
   // { boardToken: "wolverine",                displayName: "Wolverine Trading",    description: "Options market maker" },

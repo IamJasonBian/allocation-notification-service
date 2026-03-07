@@ -23,7 +23,15 @@ export default async (req: Request) => {
     await redis.ping();
     console.log("Redis connected");
 
-    for (const company of companies) {
+    // Filter out companies that were archived/removed via DELETE /api/companies/:token
+    const removedSet = await redis.smembers("meta:removed_companies");
+    const removedTokens = new Set(removedSet);
+    const activeCompanies = companies.filter((c) => !removedTokens.has(c.boardToken));
+    if (removedTokens.size > 0) {
+      console.log(`Skipping ${removedTokens.size} removed companies: ${[...removedTokens].join(", ")}`);
+    }
+
+    for (const company of activeCompanies) {
       const atsType = company.atsType || "greenhouse";
       console.log(`Processing ${company.displayName} (${company.boardToken}, ${atsType})...`);
 
@@ -55,7 +63,7 @@ export default async (req: Request) => {
       console.log("No new notifications to send");
     }
 
-    console.log(`Done. Processed ${companies.length} companies, ${allNotifications.length} notifications`);
+    console.log(`Done. Processed ${activeCompanies.length} companies, ${allNotifications.length} notifications`);
   } finally {
     await disconnectRedis();
   }
