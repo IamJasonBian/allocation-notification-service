@@ -56,37 +56,58 @@ async function handleGetJobs(redis: any, url: URL) {
     boardIds = await redis.smembers("idx:boards");
   }
 
-  const allJobs: any[] = [];
-
+  // Batch fetch: get all jobId sets in one pipeline
+  const idPipe = redis.pipeline();
   for (const boardId of boardIds) {
-    const jobIds = await redis.smembers(`idx:board_jobs:${boardId}`);
+    idPipe.smembers(`idx:board_jobs:${boardId}`);
+  }
+  const idResults = await idPipe.exec();
 
+  // Build list of all job keys we need to fetch
+  const jobEntries: { boardId: string; jobId: string; key: string }[] = [];
+  for (let i = 0; i < boardIds.length; i++) {
+    const [err, jobIds] = idResults[i] as [Error | null, string[]];
+    if (err || !jobIds) continue;
     for (const jobId of jobIds) {
-      const data = await redis.hgetall(`job:${boardId}:${jobId}`);
-      if (!data || !data.job_id) continue;
-
-      // Parse tags
-      const tags = data.tags
-        ? data.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
-        : [];
-
-      // Apply filters
-      if (statusFilter && data.status !== statusFilter) continue;
-      if (tagFilter && !tags.includes(tagFilter)) continue;
-
-      allJobs.push({
-        job_id: data.job_id,
-        board: data.board || boardId,
-        title: data.title || "",
-        url: data.url || "",
-        location: data.location || "",
-        department: data.department || "",
-        tags,
-        status: data.status || "discovered",
-        discovered_at: data.discovered_at || data.updated_at || null,
-        updated_at: data.updated_at || null,
+      jobEntries.push({
+        boardId: boardIds[i],
+        jobId,
+        key: `job:${boardIds[i]}:${jobId}`,
       });
     }
+  }
+
+  // Batch fetch all job hashes in one pipeline
+  const dataPipe = redis.pipeline();
+  for (const entry of jobEntries) {
+    dataPipe.hgetall(entry.key);
+  }
+  const dataResults = await dataPipe.exec();
+
+  const allJobs: any[] = [];
+  for (let i = 0; i < jobEntries.length; i++) {
+    const [err, data] = dataResults[i] as [Error | null, Record<string, string>];
+    if (err || !data || !data.job_id) continue;
+
+    const tags = data.tags
+      ? data.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
+      : [];
+
+    if (statusFilter && data.status !== statusFilter) continue;
+    if (tagFilter && !tags.includes(tagFilter)) continue;
+
+    allJobs.push({
+      job_id: data.job_id,
+      board: data.board || jobEntries[i].boardId,
+      title: data.title || "",
+      url: data.url || "",
+      location: data.location || "",
+      department: data.department || "",
+      tags,
+      status: data.status || "discovered",
+      discovered_at: data.discovered_at || data.updated_at || null,
+      updated_at: data.updated_at || null,
+    });
   }
 
   // Sort newest first
