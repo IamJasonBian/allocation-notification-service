@@ -3,13 +3,11 @@ import { getRedisClient, disconnectRedis } from "../../src/lib/redis.js";
 import { archiveAndRemoveCompany } from "../../src/lib/archiver.js";
 
 /**
- * DELETE /api/companies/:boardToken
+ * DELETE /api/company/remove?token=<boardToken>
  * Archives all job data for a company to Netlify Blobs (S3), then:
  *   1. Deletes all Redis keys (jobs, indexes, feeds, stats, metadata)
  *   2. Adds boardToken to `meta:removed_companies` set so the crawler
  *      and /api/companies skip it at runtime (removes from config).
- *
- * Requires NETLIFY_SITE_ID and NETLIFY_API_TOKEN env vars for blob storage.
  */
 export default async (req: Request) => {
   if (req.method !== "DELETE") {
@@ -20,26 +18,17 @@ export default async (req: Request) => {
   }
 
   const url = new URL(req.url);
-  const segments = url.pathname.split("/").filter(Boolean);
-  // Expect: ["api", "companies", "<boardToken>"]
-  const boardToken = segments[2];
+  const boardToken = url.searchParams.get("token");
 
   if (!boardToken) {
     return new Response(
-      JSON.stringify({ error: "Missing boardToken in path. Use DELETE /api/companies/{boardToken}" }),
+      JSON.stringify({ error: "Missing ?token= parameter. Use DELETE /api/company/remove?token=perplexity" }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
 
-  const siteID = process.env.NETLIFY_SITE_ID || "";
-  const apiToken = process.env.NETLIFY_API_TOKEN || "";
-
-  if (!siteID || !apiToken) {
-    return new Response(
-      JSON.stringify({ error: "NETLIFY_SITE_ID and NETLIFY_API_TOKEN env vars required for blob storage" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
-  }
+  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID || "";
+  const apiToken = process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_AUTH_TOKEN || "";
 
   const redis = getRedisClient();
 
@@ -53,7 +42,7 @@ export default async (req: Request) => {
       );
     }
 
-    // Archive + purge Redis (works even if no job data exists yet)
+    // Archive + purge Redis
     const result = await archiveAndRemoveCompany(redis, boardToken, siteID, apiToken);
 
     // Mark as removed so crawler and /api/companies skip it at runtime
@@ -83,6 +72,5 @@ export default async (req: Request) => {
 };
 
 export const config: Config = {
-  path: "/api/companies/*",
-  preferStatic: true,
+  path: "/api/company/remove",
 };

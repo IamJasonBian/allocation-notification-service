@@ -33,23 +33,23 @@ const spec = {
         },
       },
     },
-    "/api/companies/{boardToken}": {
+    "/api/company/remove": {
       delete: {
         tags: ["Companies"],
         summary: "Archive & remove a company",
-        description: "1) Archives all job data to Netlify Blobs (S3).  2) Deletes all Redis keys (jobs, indexes, feeds, stats, metadata).  3) Adds boardToken to `meta:removed_companies` so the crawler and /api/companies skip it at runtime — effectively removing it from config.",
+        description: "1) Archives all job data to Netlify Blobs (S3).  2) Deletes all Redis keys (jobs, board, indexes, feeds, stats, metadata).  3) Adds boardToken to `meta:removed_companies` so the crawler and /api/companies skip it at runtime — effectively removing it from config.",
         parameters: [
-          { name: "boardToken", in: "path", required: true, schema: { type: "string" }, description: "ATS board token (e.g. 'perplexity')" },
+          { name: "token", in: "query", required: true, schema: { type: "string" }, description: "ATS board token (e.g. 'perplexity')" },
         ],
         responses: {
           "200": {
             description: "Company archived, Redis purged, removed from config",
             content: { "application/json": { schema: { $ref: "#/components/schemas/ArchiveResponse" } } },
           },
-          "400": { description: "Missing boardToken" },
+          "400": { description: "Missing token parameter" },
           "405": { description: "Method not allowed (use DELETE)" },
           "409": { description: "Company already archived/removed" },
-          "500": { description: "Server error or missing env vars" },
+          "500": { description: "Server error" },
         },
       },
     },
