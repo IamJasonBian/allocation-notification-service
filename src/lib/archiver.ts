@@ -65,13 +65,12 @@ export async function archiveAndRemoveCompany(
     jobs,
   };
 
-  // 3. Write to Netlify Blobs (skip if credentials unavailable)
-  let blobWritten = false;
-  if (siteID && token) {
-    const store = getStore({ name: "job-archives", siteID, token });
-    await store.setJSON(blobKey, archive);
-    blobWritten = true;
+  // 3. Write to Netlify Blobs
+  if (!siteID || !token) {
+    throw new Error("NETLIFY_SITE_ID and NETLIFY_AUTH_TOKEN env vars are required for blob storage");
   }
+  const store = getStore({ name: "job-archives", siteID, token });
+  await store.setJSON(blobKey, archive);
 
   // 4. Delete all Redis keys for this company
   const pipe = redis.pipeline();
@@ -144,7 +143,7 @@ export async function archiveAndRemoveCompany(
     boardToken,
     archivedJobCount: Object.keys(jobs).length,
     deletedRedisKeys: deletedKeys,
-    blobKey: blobWritten ? blobKey : "(skipped — no NETLIFY_SITE_ID/TOKEN)",
+    blobKey,
     timestamp: nowIso,
   };
 }
