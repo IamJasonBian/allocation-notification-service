@@ -27,7 +27,6 @@ export interface Company {
 export const companies: Company[] = [
   // ── AI & Research (Lever/Ashby) ──
   { boardToken: "openai",      displayName: "OpenAI",       description: "ChatGPT, GPT-4, AI research", atsType: "lever" },
-  { boardToken: "anthropic",   displayName: "Anthropic",    description: "Claude, AI safety", atsType: "lever" },
 
   // ── Productivity & Collaboration (Lever/Ashby) ──
   { boardToken: "notion",      displayName: "Notion",       description: "All-in-one workspace", atsType: "ashby" },
@@ -37,7 +36,6 @@ export const companies: Company[] = [
 
   // ── Fintech & Payments (Lever/Ashby) ──
   { boardToken: "stripe",      displayName: "Stripe",       description: "Payments infrastructure", atsType: "lever" },
-  { boardToken: "ramp",        displayName: "Ramp",         description: "Corporate cards & spend management", atsType: "ashby" },
 
   // ── Infrastructure & DevTools (Ashby) ──
   { boardToken: "deel",        displayName: "Deel",         description: "Global payroll & compliance", atsType: "ashby" },
@@ -50,20 +48,17 @@ export const companies: Company[] = [
   { boardToken: "discord",                  displayName: "Discord",              description: "Communication platform" },
   { boardToken: "instacart",                displayName: "Instacart",            description: "Grocery delivery" },
   { boardToken: "airtable",                 displayName: "Airtable",             description: "No-code database platform" },
-  { boardToken: "vercel",                   displayName: "Vercel",               description: "Frontend cloud platform" },
   { boardToken: "brex",                     displayName: "Brex",                 description: "Corporate cards + spend mgmt" },
   { boardToken: "gusto",                    displayName: "Gusto",                description: "Payroll + HR platform" },
   { boardToken: "coreweave",                displayName: "CoreWeave",            description: "GPU cloud provider" },
   { boardToken: "runwayml",                 displayName: "Runway",               description: "AI-powered creative tools" },
 
   // ── Buy Side: PE / Growth Equity / Hedge Funds (Greenhouse) ──
-  { boardToken: "point72",                  displayName: "Point72",              description: "Multi-strategy hedge fund, equity research" },
   { boardToken: "generalatlantic",          displayName: "General Atlantic",     description: "Growth equity PE" },
   { boardToken: "gcmgrosvenor",             displayName: "GCM Grosvenor",        description: "Alternative asset management" },
   { boardToken: "vikingglobalinvestors",    displayName: "Viking Global",        description: "PE / long-short equity hedge fund" },
   { boardToken: "a16z",                     displayName: "Andreessen Horowitz",  description: "Venture capital / growth equity" },
   { boardToken: "mangroup",                 displayName: "Man Group",            description: "Quantitative hedge fund / asset manager" },
-  { boardToken: "clearstreet",              displayName: "Clear Street",         description: "Prime brokerage, risk, trading systems" },
   { boardToken: "towerresearchcapital",     displayName: "Tower Research",       description: "Quantitative trading firm" },
   { boardToken: "gtcr",                     displayName: "GTCR",                description: "Middle-market PE, $35B+ AUM" },
 
