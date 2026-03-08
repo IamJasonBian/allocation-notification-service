@@ -3,6 +3,8 @@ import { getRedisClient, disconnectRedis } from "../../src/lib/redis.js";
 import { companies } from "../../src/config/companies.js";
 import { fetchJobs } from "../../src/lib/job-fetcher.js";
 import { diffAndUpdate } from "../../src/lib/differ.js";
+import { getAllActiveTags } from "../../src/lib/tag-store.js";
+import { scoreJob } from "../../src/lib/relevance-scorer.js";
 
 /**
  * /api/crawler/jobs
@@ -195,6 +197,10 @@ async function handlePostJobs(redis: any, req: Request) {
   const removedTokens = new Set(removedSet);
   const activeCompanies = companies.filter((c) => !removedTokens.has(c.boardToken));
 
+  // Load relevance filter tags
+  const activeTags = await getAllActiveTags(redis);
+  const scoringEnabled = activeTags.length > 0;
+
   const results: any[] = [];
 
   for (const company of activeCompanies) {
@@ -203,6 +209,12 @@ async function handlePostJobs(redis: any, req: Request) {
       if (apiJobs.length === 0) {
         results.push({ board: company.boardToken, jobs: 0, status: "empty" });
         continue;
+      }
+
+      // Beam search relevance filter
+      let relevantJobs = apiJobs;
+      if (scoringEnabled) {
+        relevantJobs = apiJobs.filter((job) => scoreJob(job, activeTags).relevant);
       }
 
       // Ensure board exists in Redis
@@ -222,13 +234,16 @@ async function handlePostJobs(redis: any, req: Request) {
       const pipe = redis.pipeline();
       let newCount = 0;
 
-      for (const job of apiJobs) {
+      for (const job of relevantJobs) {
         const jobKey = `job:${company.boardToken}:${job.id}`;
         const existing = await redis.exists(jobKey);
 
         if (!existing) {
           newCount++;
-          const tags = extractBasicTags(job.title, job.department);
+          const scored = scoringEnabled ? scoreJob(job, activeTags) : null;
+          const tags = scored && scored.matchedTags.length > 0
+            ? scored.matchedTags
+            : extractBasicTags(job.title, job.department);
           pipe.hset(jobKey, {
             job_id: job.id,
             board: company.boardToken,
@@ -251,7 +266,14 @@ async function handlePostJobs(redis: any, req: Request) {
       }
 
       await pipe.exec();
-      results.push({ board: company.boardToken, jobs: apiJobs.length, new: newCount, status: "ok" });
+      results.push({
+        board: company.boardToken,
+        fetched: apiJobs.length,
+        relevant: relevantJobs.length,
+        filtered: apiJobs.length - relevantJobs.length,
+        new: newCount,
+        status: "ok",
+      });
     } catch (err: any) {
       results.push({ board: company.boardToken, jobs: 0, status: "error", error: err.message });
     }
