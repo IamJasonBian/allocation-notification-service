@@ -1,6 +1,7 @@
 import type Redis from "ioredis";
 import type { Company } from "../config/companies.js";
 import type { UnifiedJob, JobNotification, DiffStats } from "./types.js";
+import type { RelevanceResult } from "./relevance-scorer.js";
 import { normalizeLocation, normalizeDepartment } from "./normalize.js";
 import { extractTags } from "./tags.js";
 import { createHash } from "crypto";
@@ -18,6 +19,7 @@ export async function diffAndUpdate(
   r: Redis,
   company: Company,
   apiJobs: UnifiedJob[],
+  scoredResults?: Map<string, RelevanceResult>,
 ): Promise<{ stats: DiffStats; notifications: JobNotification[] }> {
   const { boardToken, displayName } = company;
   const now = new Date();
@@ -42,7 +44,10 @@ export async function diffAndUpdate(
     const updated = job.updated_at || nowIso;
 
     const hash = contentHash(title, locationRaw, dept);
-    const tags = extractTags(title, dept);
+    const scored = scoredResults?.get(jobId);
+    const tags = scored && scored.matchedTags.length > 0
+      ? new Set(scored.matchedTags)
+      : extractTags(title, dept);
     const normLoc = normalizeLocation(locationRaw);
     const normDept = normalizeDepartment(dept);
 

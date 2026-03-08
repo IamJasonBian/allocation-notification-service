@@ -26,3 +26,58 @@
   from = "/api/jobs/search"
   to = "/.netlify/functions/jobs-search"
   status = 200
+
+[[redirects]]
+  from = "/api/resume-stats"
+  to = "/.netlify/functions/resume-stats"
+  status = 200
+
+[[redirects]]
+  from = "/api/openapi.json"
+  to = "/.netlify/functions/openapi"
+  status = 200
+
+[[redirects]]
+  from = "/api/docs"
+  to = "/.netlify/functions/swagger"
+  status = 200
+
+[[redirects]]
+  from = "/api/redis/keys"
+  to = "/.netlify/functions/redis-keys"
+  status = 200
+
+[[redirects]]
+  from = "/api/redis/key"
+  to = "/.netlify/functions/redis-key"
+  status = 200
+
+[[redirects]]
+  from = "/api/redis/job"
+  to = "/.netlify/functions/redis-job"
+  status = 200
+
+[[redirects]]
+  from = "/api/company/remove"
+  to = "/.netlify/functions/remove-company"
+  status = 200
+
+[[redirects]]
+  from = "/api/crawler/boards"
+  to = "/.netlify/functions/crawler-boards"
+  status = 200
+
+[[redirects]]
+  from = "/api/crawler/jobs"
+  to = "/.netlify/functions/crawler-jobs"
+  status = 200
+
+[[redirects]]
+  from = "/api/crawler/users"
+  to = "/.netlify/functions/crawler-users"
+  status = 200
+
+[[redirects]]
+  from = "/api/tags"
+  to = "/.netlify/functions/tags"
+  status = 200

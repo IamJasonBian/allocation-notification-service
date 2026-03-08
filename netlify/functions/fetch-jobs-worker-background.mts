@@ -3,7 +3,10 @@ import { getRedisClient, disconnectRedis } from "../../src/lib/redis.js";
 import { fetchJobs } from "../../src/lib/job-fetcher.js";
 import { diffAndUpdate } from "../../src/lib/differ.js";
 import { sendNotificationDigest } from "../../src/lib/notifier.js";
+import { getAllActiveTags } from "../../src/lib/tag-store.js";
+import { scoreJob } from "../../src/lib/relevance-scorer.js";
 import type { JobNotification } from "../../src/lib/types.js";
+import type { RelevanceResult } from "../../src/lib/relevance-scorer.js";
 
 /**
  * Background function (15-min timeout).
@@ -23,7 +26,24 @@ export default async (req: Request) => {
     await redis.ping();
     console.log("Redis connected");
 
-    for (const company of companies) {
+    // Load relevance filter tags
+    const activeTags = await getAllActiveTags(redis);
+    const scoringEnabled = activeTags.length > 0;
+    if (scoringEnabled) {
+      console.log(`Relevance filter active: ${activeTags.length} tags (${activeTags.map((t) => t.title).join(", ")})`);
+    } else {
+      console.log("No relevance tags defined — storing all jobs");
+    }
+
+    // Filter out companies that were archived/removed via DELETE /api/companies/:token
+    const removedSet = await redis.smembers("meta:removed_companies");
+    const removedTokens = new Set(removedSet);
+    const activeCompanies = companies.filter((c) => !removedTokens.has(c.boardToken));
+    if (removedTokens.size > 0) {
+      console.log(`Skipping ${removedTokens.size} removed companies: ${[...removedTokens].join(", ")}`);
+    }
+
+    for (const company of activeCompanies) {
       const atsType = company.atsType || "greenhouse";
       console.log(`Processing ${company.displayName} (${company.boardToken}, ${atsType})...`);
 
@@ -33,7 +53,20 @@ export default async (req: Request) => {
         continue;
       }
 
-      const { stats, notifications } = await diffAndUpdate(redis, company, apiJobs);
+      // Beam search relevance filter
+      let jobsToStore = apiJobs;
+      let scoredMap: Map<string, RelevanceResult> | undefined;
+      if (scoringEnabled) {
+        scoredMap = new Map();
+        jobsToStore = apiJobs.filter((job) => {
+          const result = scoreJob(job, activeTags);
+          scoredMap!.set(job.id, result);
+          return result.relevant;
+        });
+        console.log(`  ${company.boardToken}: ${apiJobs.length} fetched → ${jobsToStore.length} relevant (${apiJobs.length - jobsToStore.length} filtered)`);
+      }
+
+      const { stats, notifications } = await diffAndUpdate(redis, company, jobsToStore, scoredMap);
       allNotifications.push(...notifications);
 
       console.log(`  ${company.boardToken}: new=${stats.newCount} updated=${stats.updatedCount} removed=${stats.removedCount} unchanged=${stats.unchangedCount}`);
@@ -55,7 +88,7 @@ export default async (req: Request) => {
       console.log("No new notifications to send");
     }
 
-    console.log(`Done. Processed ${companies.length} companies, ${allNotifications.length} notifications`);
+    console.log(`Done. Processed ${activeCompanies.length} companies, ${allNotifications.length} notifications`);
   } finally {
     await disconnectRedis();
   }
