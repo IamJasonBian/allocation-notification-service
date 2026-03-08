@@ -1,4 +1,3 @@
-import type { Config } from "@netlify/functions";
 import { getRedisClient, disconnectRedis } from "../../src/lib/redis.js";
 import { companies } from "../../src/config/companies.js";
 import { fetchJobs } from "../../src/lib/job-fetcher.js";
@@ -318,7 +317,3 @@ function json(data: unknown, status = 200) {
     headers: { "Content-Type": "application/json" },
   });
 }
-
-export const config: Config = {
-  path: "/api/crawler/jobs",
-};

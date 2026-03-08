@@ -1,4 +1,3 @@
-import type { Config } from "@netlify/functions";
 import { getRedisClient, disconnectRedis } from "../../src/lib/redis.js";
 
 /**
@@ -39,8 +38,4 @@ export default async (req: Request) => {
   } finally {
     await disconnectRedis();
   }
-};
-
-export const config: Config = {
-  path: "/api/crawler/boards",
 };
