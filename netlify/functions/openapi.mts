@@ -5,7 +5,7 @@ const spec = {
   info: {
     title: "Allocation Notification Service API",
     description: "Job discovery and notification service. Polls Greenhouse, Lever, and Ashby boards, diffs against Redis, sends Slack alerts. Covers tech, PE (buy side), equity research & investment banking (sell side).",
-    version: "1.2.0",
+    version: "1.3.0",
   },
   servers: [
     { url: "https://route-agent.netlify.app", description: "Production" },
@@ -16,6 +16,8 @@ const spec = {
     { name: "Jobs", description: "Job search, filtering, and new-job feeds" },
     { name: "Redis", description: "Direct Redis access — keys, values, individual job records" },
     { name: "Resume A/B Testing", description: "Resume variant statistics" },
+    { name: "Crawler", description: "Crawl execution, job status updates, and run history" },
+    { name: "Tags", description: "Relevance tag management (beam search filter)" },
     { name: "Debug", description: "Debug & diagnostics" },
   ],
   paths: {
@@ -107,6 +109,124 @@ const spec = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/SearchResponse" } } },
           },
         },
+      },
+    },
+
+    // ── Crawler ──
+    "/api/crawler/jobs": {
+      get: {
+        tags: ["Crawler"],
+        summary: "List jobs or fetch crawl runs",
+        description: "Returns all crawler jobs from Redis (new schema). Use `runs_for` param to get crawl run history instead.",
+        parameters: [
+          { name: "status", in: "query", schema: { type: "string", enum: ["active", "removed", "applying", "applied"] }, description: "Filter by job status" },
+          { name: "board", in: "query", schema: { type: "string" }, description: "Filter by board token" },
+          { name: "tag", in: "query", schema: { type: "string" }, description: "Filter by tag" },
+          { name: "runs_for", in: "query", schema: { type: "string" }, description: "If present, returns crawl run history instead of jobs" },
+        ],
+        responses: {
+          "200": {
+            description: "Job list or crawl run list",
+            content: { "application/json": { schema: { oneOf: [
+              { $ref: "#/components/schemas/CrawlerJobListResponse" },
+              { type: "array", items: { $ref: "#/components/schemas/CrawlRun" } },
+            ] } } },
+          },
+        },
+      },
+      patch: {
+        tags: ["Crawler"],
+        summary: "Update job status",
+        description: "Sets the status of a specific job. Used by the auto-apply service to mark jobs as 'applying' (in progress) or 'applied' (done).",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["board", "job_id", "status"],
+                properties: {
+                  board: { type: "string", example: "openai", description: "Board token" },
+                  job_id: { type: "string", example: "12345", description: "Job ID" },
+                  status: { type: "string", enum: ["active", "removed", "applying", "applied"], description: "New status" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Status updated",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                ok: { type: "boolean" },
+                board: { type: "string" },
+                job_id: { type: "string" },
+                status: { type: "string" },
+              },
+            } } },
+          },
+          "400": { description: "Missing or invalid parameters" },
+          "404": { description: "Job not found" },
+        },
+      },
+      post: {
+        tags: ["Crawler"],
+        summary: "Trigger a crawl",
+        description: "Triggers a full crawl of all active boards with beam search relevance filtering. Creates a crawl run record with stats.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["action"],
+                properties: {
+                  action: { type: "string", enum: ["retrieve"], description: "Must be 'retrieve'" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Crawl results with run ID and per-board stats",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/CrawlTriggerResponse" } } },
+          },
+        },
+      },
+    },
+
+    // ── Tags ──
+    "/api/tags": {
+      get: {
+        tags: ["Tags"],
+        summary: "List active tags or get single tag",
+        description: "Returns all enabled relevance tags. Use ?name=X for a single tag, add &history=true for version history.",
+        parameters: [
+          { name: "name", in: "query", schema: { type: "string" }, description: "Tag name (optional)" },
+          { name: "history", in: "query", schema: { type: "string", enum: ["true"] }, description: "Include version history" },
+        ],
+        responses: { "200": { description: "Tag list or single tag" } },
+      },
+      post: {
+        tags: ["Tags"],
+        summary: "Create a tag",
+        requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["title", "description"], properties: { title: { type: "string" }, description: { type: "string" }, threshold: { type: "number" }, enabled: { type: "boolean" } } } } } },
+        responses: { "201": { description: "Tag created" }, "409": { description: "Tag already exists" } },
+      },
+      put: {
+        tags: ["Tags"],
+        summary: "Update a tag",
+        requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["title"], properties: { title: { type: "string" }, description: { type: "string" }, threshold: { type: "number" }, enabled: { type: "boolean" } } } } } },
+        responses: { "200": { description: "Tag updated" }, "404": { description: "Tag not found" } },
+      },
+      delete: {
+        tags: ["Tags"],
+        summary: "Disable (soft-delete) a tag",
+        parameters: [{ name: "name", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Tag disabled" }, "404": { description: "Tag not found" } },
       },
     },
 
@@ -377,7 +497,60 @@ const spec = {
           firstSeenAt: { type: "string", format: "date-time" },
           lastSeenAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
-          status: { type: "string", enum: ["active", "removed"] },
+          status: { type: "string", enum: ["active", "removed", "applying", "applied"] },
+        },
+      },
+      CrawlerJobListResponse: {
+        type: "object",
+        properties: {
+          count: { type: "integer" },
+          jobs: { type: "array", items: { $ref: "#/components/schemas/CrawlerJobRecord" } },
+        },
+      },
+      CrawlerJobRecord: {
+        type: "object",
+        properties: {
+          job_id: { type: "string" },
+          board: { type: "string" },
+          title: { type: "string" },
+          url: { type: "string" },
+          location: { type: "string" },
+          department: { type: "string" },
+          tags: { type: "array", items: { type: "string" } },
+          status: { type: "string", enum: ["active", "removed", "applying", "applied"] },
+          discovered_at: { type: "string", format: "date-time" },
+          updated_at: { type: "string", format: "date-time" },
+        },
+      },
+      CrawlRun: {
+        type: "object",
+        properties: {
+          run_id: { type: "string", format: "uuid" },
+          started_at: { type: "string", format: "date-time" },
+          completed_at: { type: "string", format: "date-time", nullable: true },
+          status: { type: "string", enum: ["running", "completed", "failed"] },
+          trigger: { type: "string", enum: ["scheduled", "manual"] },
+          boards_total: { type: "integer" },
+          boards_ok: { type: "integer" },
+          boards_error: { type: "integer" },
+          jobs_fetched: { type: "integer" },
+          jobs_relevant: { type: "integer" },
+          jobs_new: { type: "integer" },
+          jobs_updated: { type: "integer" },
+          jobs_removed: { type: "integer" },
+          jobs_unchanged: { type: "integer" },
+          duration_ms: { type: "integer" },
+          error: { type: "string", nullable: true },
+        },
+      },
+      CrawlTriggerResponse: {
+        type: "object",
+        properties: {
+          action: { type: "string" },
+          run_id: { type: "string", format: "uuid" },
+          boards: { type: "integer" },
+          results: { type: "array", items: { type: "object" } },
+          timestamp: { type: "string", format: "date-time" },
         },
       },
       RedisJobRecord: {
@@ -392,7 +565,7 @@ const spec = {
           url: { type: "string" },
           department: { type: "string" },
           location: { type: "string" },
-          status: { type: "string", enum: ["active", "removed"] },
+          status: { type: "string", enum: ["active", "removed", "applying", "applied"] },
           first_seen_at: { type: "string", format: "date-time" },
           last_seen_at: { type: "string", format: "date-time" },
           updated_at: { type: "string", format: "date-time" },

@@ -4,10 +4,12 @@ import { fetchJobs } from "../../src/lib/job-fetcher.js";
 import { diffAndUpdate } from "../../src/lib/differ.js";
 import { getAllActiveTags } from "../../src/lib/tag-store.js";
 import { scoreJob } from "../../src/lib/relevance-scorer.js";
+import type { RelevanceResult } from "../../src/lib/relevance-scorer.js";
+import { randomUUID } from "crypto";
 
 /**
  * /api/crawler/jobs
- *   GET   — list/filter jobs or fetch runs
+ *   GET   — list/filter jobs or fetch crawl runs
  *   PATCH — update job status
  *   POST  — trigger crawl (action: "retrieve")
  */
@@ -18,10 +20,9 @@ export default async (req: Request) => {
     const url = new URL(req.url);
 
     if (req.method === "GET") {
-      // If runs_for param present → return runs
       const runsFor = url.searchParams.get("runs_for");
       if (runsFor !== null) {
-        return await handleGetRuns(redis, runsFor);
+        return await handleGetRuns(redis);
       }
       return await handleGetJobs(redis, url);
     }
@@ -43,50 +44,60 @@ export default async (req: Request) => {
   }
 };
 
-/** GET /api/crawler/jobs?status=X&board=Y&tag=Z */
+/** GET /api/crawler/jobs?status=X&board=Y&tag=Z — reads from new schema */
 async function handleGetJobs(redis: any, url: URL) {
   const statusFilter = url.searchParams.get("status");
   const boardFilter = url.searchParams.get("board");
   const tagFilter = url.searchParams.get("tag");
 
-  // Determine which boards to scan
-  let boardIds: string[];
+  // Read from new schema: meta:companies has board tokens
+  let boardTokens: string[];
   if (boardFilter) {
-    boardIds = [boardFilter];
+    boardTokens = [boardFilter];
   } else {
-    boardIds = await redis.smembers("idx:boards");
+    boardTokens = await redis.smembers("meta:companies");
   }
 
-  // Batch fetch: get all jobId sets in one pipeline
+  // Get composite keys (boardToken:jobId) from idx:company:{token}
   const idPipe = redis.pipeline();
-  for (const boardId of boardIds) {
-    idPipe.smembers(`idx:board_jobs:${boardId}`);
+  for (const token of boardTokens) {
+    idPipe.smembers(`idx:company:${token}`);
   }
   const idResults = await idPipe.exec();
 
-  // Build list of all job keys we need to fetch
-  const jobEntries: { boardId: string; jobId: string; key: string }[] = [];
-  for (let i = 0; i < boardIds.length; i++) {
-    const [err, jobIds] = idResults[i] as [Error | null, string[]];
-    if (err || !jobIds) continue;
-    for (const jobId of jobIds) {
-      jobEntries.push({
-        boardId: boardIds[i],
-        jobId,
-        key: `job:${boardIds[i]}:${jobId}`,
-      });
-    }
+  const compositeKeys: string[] = [];
+  for (let i = 0; i < boardTokens.length; i++) {
+    const [err, keys] = idResults[i] as [Error | null, string[]];
+    if (err || !keys) continue;
+    compositeKeys.push(...keys);
   }
 
-  // Batch fetch all job hashes in one pipeline
+  // Optionally filter by status index before fetching hashes
+  let keysToFetch = compositeKeys;
+  if (statusFilter) {
+    const statusMembers = await redis.smembers(`idx:status:${statusFilter}`);
+    const statusSet = new Set(statusMembers);
+    keysToFetch = compositeKeys.filter((k) => statusSet.has(k));
+  }
+
+  // Optionally filter by tag index
+  if (tagFilter) {
+    const tagMembers = await redis.smembers(`idx:tag:${tagFilter}`);
+    const tagSet = new Set(tagMembers);
+    keysToFetch = keysToFetch.filter((k) => tagSet.has(k));
+  }
+
+  // Batch fetch job hashes: jobs:{boardToken}:{jobId}
   const dataPipe = redis.pipeline();
-  for (const entry of jobEntries) {
-    dataPipe.hgetall(entry.key);
+  for (const ck of keysToFetch) {
+    const [board, ...idParts] = ck.split(":");
+    const jobId = idParts.join(":");
+    dataPipe.hgetall(`jobs:${board}:${jobId}`);
   }
   const dataResults = await dataPipe.exec();
 
   const allJobs: any[] = [];
-  for (let i = 0; i < jobEntries.length; i++) {
+  for (let i = 0; i < keysToFetch.length; i++) {
     const [err, data] = dataResults[i] as [Error | null, Record<string, string>];
     if (err || !data || !data.job_id) continue;
 
@@ -94,68 +105,67 @@ async function handleGetJobs(redis: any, url: URL) {
       ? data.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
       : [];
 
-    if (statusFilter && data.status !== statusFilter) continue;
-    if (tagFilter && !tags.includes(tagFilter)) continue;
-
     allJobs.push({
       job_id: data.job_id,
-      board: data.board || jobEntries[i].boardId,
+      board: data.company || keysToFetch[i].split(":")[0],
       title: data.title || "",
       url: data.url || "",
       location: data.location || "",
       department: data.department || "",
       tags,
-      status: data.status || "discovered",
-      discovered_at: data.discovered_at || data.updated_at || null,
+      status: data.status || "active",
+      discovered_at: data.first_seen_at || data.last_seen_at || null,
       updated_at: data.updated_at || null,
     });
   }
 
-  // Sort newest first
   allJobs.sort((a, b) => {
     const ta = a.discovered_at ? new Date(a.discovered_at).getTime() : 0;
     const tb = b.discovered_at ? new Date(b.discovered_at).getTime() : 0;
     return tb - ta;
   });
 
-  return json(allJobs);
+  return json({ count: allJobs.length, jobs: allJobs });
 }
 
-/** GET /api/crawler/jobs?runs_for= or ?runs_for=jobId */
-async function handleGetRuns(redis: any, runsFor: string) {
-  const runKeys = await redis.keys("run:*");
+/** GET /api/crawler/jobs?runs_for= → return crawl run history */
+async function handleGetRuns(redis: any) {
+  const runIds = await redis.zrevrange("idx:crawl_runs", 0, 99);
+
+  if (runIds.length === 0) {
+    return json([]);
+  }
+
+  const pipe = redis.pipeline();
+  for (const id of runIds) {
+    pipe.hgetall(`crawl_run:${id}`);
+  }
+  const results = await pipe.exec();
+
   const runs: any[] = [];
-
-  for (const key of runKeys) {
-    const data = await redis.hgetall(key);
-    if (!data || !data.run_id) continue;
-
-    // If runsFor is non-empty, filter by job_id
-    if (runsFor && data.job_id !== runsFor) continue;
-
-    let artifacts = null;
-    if (data.artifacts) {
-      try { artifacts = JSON.parse(data.artifacts); } catch { /* ignore */ }
-    }
+  for (let i = 0; i < results.length; i++) {
+    const [err, data] = results[i] as [Error | null, Record<string, string>];
+    if (err || !data || !data.run_id) continue;
 
     runs.push({
       run_id: data.run_id,
-      job_id: data.job_id || "",
-      board: data.board || "",
-      variant_id: data.variant_id || null,
-      status: data.status || "pending",
       started_at: data.started_at || null,
       completed_at: data.completed_at || null,
+      status: data.status || "unknown",
+      trigger: data.trigger || "unknown",
+      boards_total: parseInt(data.boards_total || "0"),
+      boards_ok: parseInt(data.boards_ok || "0"),
+      boards_error: parseInt(data.boards_error || "0"),
+      jobs_fetched: parseInt(data.jobs_fetched || "0"),
+      jobs_relevant: parseInt(data.jobs_relevant || "0"),
+      jobs_new: parseInt(data.jobs_new || "0"),
+      jobs_updated: parseInt(data.jobs_updated || "0"),
+      jobs_removed: parseInt(data.jobs_removed || "0"),
+      jobs_unchanged: parseInt(data.jobs_unchanged || "0"),
+      duration_ms: parseInt(data.duration_ms || "0"),
       error: data.error || null,
-      artifacts,
     });
   }
-
-  runs.sort((a, b) => {
-    const ta = a.started_at ? new Date(a.started_at).getTime() : 0;
-    const tb = b.started_at ? new Date(b.started_at).getTime() : 0;
-    return tb - ta;
-  });
 
   return json(runs);
 }
@@ -169,16 +179,29 @@ async function handlePatchJob(redis: any, req: Request) {
     return json({ error: "Missing board, job_id, or status" }, 400);
   }
 
-  const hashKey = `job:${board}:${job_id}`;
+  const validStatuses = ["active", "removed", "applying", "applied"];
+  if (!validStatuses.includes(status)) {
+    return json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` }, 400);
+  }
+
+  const hashKey = `jobs:${board}:${job_id}`;
   const exists = await redis.exists(hashKey);
   if (!exists) {
     return json({ error: `Job ${hashKey} not found` }, 404);
   }
 
-  await redis.hset(hashKey, {
-    status,
-    updated_at: new Date().toISOString(),
-  });
+  const oldStatus = await redis.hget(hashKey, "status");
+  const compositeKey = `${board}:${job_id}`;
+
+  const pipe = redis.pipeline();
+  pipe.hset(hashKey, { status, updated_at: new Date().toISOString() });
+
+  if (oldStatus && oldStatus !== status) {
+    pipe.srem(`idx:status:${oldStatus}`, compositeKey);
+  }
+  pipe.sadd(`idx:status:${status}`, compositeKey);
+
+  await pipe.exec();
 
   return json({ ok: true, board, job_id, status });
 }
@@ -191,6 +214,19 @@ async function handlePostJobs(redis: any, req: Request) {
     return json({ error: "Unknown action. Use { action: 'retrieve' }" }, 400);
   }
 
+  // Create crawl run record
+  const runId = randomUUID();
+  const startTime = Date.now();
+  const startIso = new Date(startTime).toISOString();
+
+  await redis.hset(`crawl_run:${runId}`, {
+    run_id: runId,
+    started_at: startIso,
+    status: "running",
+    trigger: "manual",
+  });
+  await redis.zadd("idx:crawl_runs", String(startTime / 1000), runId);
+
   // Filter out removed companies
   const removedSet = await redis.smembers("meta:removed_companies");
   const removedTokens = new Set(removedSet);
@@ -201,114 +237,82 @@ async function handlePostJobs(redis: any, req: Request) {
   const scoringEnabled = activeTags.length > 0;
 
   const results: any[] = [];
+  let totalFetched = 0, totalRelevant = 0, totalNew = 0;
+  let totalUpdated = 0, totalRemoved = 0, totalUnchanged = 0;
+  let boardsOk = 0, boardsError = 0;
 
   for (const company of activeCompanies) {
     try {
       const apiJobs = await fetchJobs(company);
       if (apiJobs.length === 0) {
         results.push({ board: company.boardToken, jobs: 0, status: "empty" });
+        boardsOk++;
         continue;
       }
 
-      // Beam search relevance filter
-      let relevantJobs = apiJobs;
+      let jobsToStore = apiJobs;
+      let scoredMap: Map<string, RelevanceResult> | undefined;
       if (scoringEnabled) {
-        relevantJobs = apiJobs.filter((job) => scoreJob(job, activeTags).relevant);
-      }
-
-      // Ensure board exists in Redis
-      const boardKey = `board:${company.boardToken}`;
-      const boardExists = await redis.exists(boardKey);
-      if (!boardExists) {
-        await redis.hset(boardKey, {
-          id: company.boardToken,
-          company: company.displayName,
-          ats: company.atsType || "greenhouse",
-          created_at: new Date().toISOString(),
+        scoredMap = new Map();
+        jobsToStore = apiJobs.filter((job) => {
+          const result = scoreJob(job, activeTags);
+          scoredMap!.set(job.id, result);
+          return result.relevant;
         });
-        await redis.sadd("idx:boards", company.boardToken);
       }
 
-      // Upsert jobs into production schema
-      const pipe = redis.pipeline();
-      let newCount = 0;
+      const { stats } = await diffAndUpdate(redis, company, jobsToStore, scoredMap);
 
-      for (const job of relevantJobs) {
-        const jobKey = `job:${company.boardToken}:${job.id}`;
-        const existing = await redis.exists(jobKey);
+      totalFetched += apiJobs.length;
+      totalRelevant += jobsToStore.length;
+      totalNew += stats.newCount;
+      totalUpdated += stats.updatedCount;
+      totalRemoved += stats.removedCount;
+      totalUnchanged += stats.unchangedCount;
+      boardsOk++;
 
-        if (!existing) {
-          newCount++;
-          const scored = scoringEnabled ? scoreJob(job, activeTags) : null;
-          const tags = scored && scored.matchedTags.length > 0
-            ? scored.matchedTags
-            : extractBasicTags(job.title, job.department);
-          pipe.hset(jobKey, {
-            job_id: job.id,
-            board: company.boardToken,
-            title: job.title,
-            url: job.url,
-            location: job.location,
-            department: job.department,
-            tags: tags.join(","),
-            status: "discovered",
-            discovered_at: new Date().toISOString(),
-            updated_at: job.updated_at || new Date().toISOString(),
-          });
-          pipe.sadd(`idx:board_jobs:${company.boardToken}`, job.id);
-
-          // Add to tag indexes
-          for (const tag of tags) {
-            pipe.sadd(`idx:tag:${tag}`, job.id);
-          }
-        }
-      }
-
-      await pipe.exec();
       results.push({
         board: company.boardToken,
         fetched: apiJobs.length,
-        relevant: relevantJobs.length,
-        filtered: apiJobs.length - relevantJobs.length,
-        new: newCount,
+        relevant: jobsToStore.length,
+        filtered: apiJobs.length - jobsToStore.length,
+        new: stats.newCount,
+        updated: stats.updatedCount,
+        removed: stats.removedCount,
         status: "ok",
       });
     } catch (err: any) {
+      boardsError++;
       results.push({ board: company.boardToken, jobs: 0, status: "error", error: err.message });
     }
 
-    // Be polite to ATS APIs
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
 
+  // Finalize crawl run
+  const endTime = Date.now();
+  await redis.hset(`crawl_run:${runId}`, {
+    completed_at: new Date(endTime).toISOString(),
+    status: "completed",
+    boards_total: String(activeCompanies.length),
+    boards_ok: String(boardsOk),
+    boards_error: String(boardsError),
+    jobs_fetched: String(totalFetched),
+    jobs_relevant: String(totalRelevant),
+    jobs_new: String(totalNew),
+    jobs_updated: String(totalUpdated),
+    jobs_removed: String(totalRemoved),
+    jobs_unchanged: String(totalUnchanged),
+    duration_ms: String(endTime - startTime),
+  });
+
   return json({
     action: "retrieve",
+    run_id: runId,
     boards: results.length,
     results,
     timestamp: new Date().toISOString(),
   });
-}
-
-function extractBasicTags(title: string, department: string): string[] {
-  const tags: string[] = [];
-  const text = `${title} ${department}`.toLowerCase();
-
-  if (/engineer|develop|software|swe/i.test(text)) tags.push("engineering");
-  if (/data|analytics|scientist/i.test(text)) tags.push("data");
-  if (/machine learn|ml |ai /i.test(text)) tags.push("ml");
-  if (/research/i.test(text)) tags.push("research");
-  if (/senior|staff|principal|lead/i.test(text)) tags.push("senior");
-  if (/intern|co-?op/i.test(text)) tags.push("intern");
-  if (/product\s*manag/i.test(text)) tags.push("product");
-  if (/design|ux|ui/i.test(text)) tags.push("design");
-  if (/quant|trading|risk|portfolio/i.test(text)) tags.push("quant");
-  if (/finance|accounting|audit/i.test(text)) tags.push("finance");
-  if (/analyst/i.test(text)) tags.push("analyst");
-  if (/sales|business\s*develop/i.test(text)) tags.push("sales");
-  if (/marketing|growth/i.test(text)) tags.push("marketing");
-  if (/ops|operations|infra/i.test(text)) tags.push("ops");
-
-  return tags;
 }
 
 function json(data: unknown, status = 200) {
