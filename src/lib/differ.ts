@@ -104,6 +104,9 @@ export async function diffAndUpdate(
       const oldTags = ((await r.hget(hashKey, "tags")) || "").split(",").filter(Boolean);
       const oldNormDept = normalizeDepartment(oldDept);
       const oldNormLoc = normalizeLocation(oldLoc);
+      // Preserve user-set statuses (applying, applied) — don't overwrite
+      const existingStatus = (await r.hget(hashKey, "status")) || "active";
+      const preserveStatus = existingStatus === "applying" || existingStatus === "applied";
 
       if (oldNormDept !== normDept) pipe.srem(`idx:dept:${oldNormDept}`, compositeKey);
       if (oldNormLoc !== normLoc) pipe.srem(`idx:location:${oldNormLoc}`, compositeKey);
@@ -111,21 +114,27 @@ export async function diffAndUpdate(
         if (!tags.has(oldTag)) pipe.srem(`idx:tag:${oldTag}`, compositeKey);
       }
 
-      pipe.hset(hashKey, {
+      const updateFields: Record<string, string> = {
         title,
         url,
         department: dept,
         location: locationRaw,
-        status: "active",
         last_seen_at: nowIso,
         updated_at: updated,
         content_hash: hash,
         tags: [...tags].sort().join(","),
-      });
+      };
+      // Only reset to active if status wasn't set by agent/user
+      if (!preserveStatus) {
+        updateFields.status = "active";
+      }
+      pipe.hset(hashKey, updateFields);
 
       pipe.sadd(`idx:dept:${normDept}`, compositeKey);
       pipe.sadd(`idx:location:${normLoc}`, compositeKey);
-      pipe.sadd("idx:status:active", compositeKey);
+      if (!preserveStatus) {
+        pipe.sadd("idx:status:active", compositeKey);
+      }
       for (const tag of tags) {
         pipe.sadd(`idx:tag:${tag}`, compositeKey);
       }
@@ -139,10 +148,12 @@ export async function diffAndUpdate(
   // ── Detect REMOVED jobs ──
   const companyJobs = await r.smembers(`idx:company:${boardToken}`);
   const activeJobs = await r.smembers("idx:status:active");
-  const activeSet = new Set(activeJobs);
+  const applyingJobs = await r.smembers("idx:status:applying");
+  const appliedJobs = await r.smembers("idx:status:applied");
+  const liveSet = new Set([...activeJobs, ...applyingJobs, ...appliedJobs]);
 
   for (const compositeKey of companyJobs) {
-    if (!activeSet.has(compositeKey)) continue;
+    if (!liveSet.has(compositeKey)) continue;
     if (apiJobIds.has(compositeKey)) continue;
 
     stats.removedCount++;
