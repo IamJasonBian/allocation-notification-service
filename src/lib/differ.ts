@@ -4,6 +4,7 @@ import type { UnifiedJob, JobNotification, DiffStats } from "./types.js";
 import type { RelevanceResult } from "./relevance-scorer.js";
 import { normalizeLocation, normalizeDepartment } from "./normalize.js";
 import { extractTags } from "./tags.js";
+import { getCompanySectors } from "../config/sectors.js";
 import { createHash } from "crypto";
 
 const REMOVED_TTL_DAYS = 90;
@@ -48,6 +49,10 @@ export async function diffAndUpdate(
     const tags = scored && scored.matchedTags.length > 0
       ? new Set(scored.matchedTags)
       : extractTags(title, dept);
+    // Merge company-level sector tags (e.g. "finance")
+    for (const sector of getCompanySectors(boardToken)) {
+      tags.add(sector);
+    }
     const normLoc = normalizeLocation(locationRaw);
     const normDept = normalizeDepartment(dept);
 
@@ -141,7 +146,21 @@ export async function diffAndUpdate(
     } else {
       // ── UNCHANGED ──
       stats.unchangedCount++;
-      pipe.hset(hashKey, "last_seen_at", nowIso);
+      // Re-sync tags (picks up new sector tags, tag logic changes)
+      const oldTagStr = (await r.hget(hashKey, "tags")) || "";
+      const newTagStr = [...tags].sort().join(",");
+      if (oldTagStr !== newTagStr) {
+        const oldTags = oldTagStr.split(",").filter(Boolean);
+        for (const oldTag of oldTags) {
+          if (!tags.has(oldTag)) pipe.srem(`idx:tag:${oldTag}`, compositeKey);
+        }
+        for (const tag of tags) {
+          pipe.sadd(`idx:tag:${tag}`, compositeKey);
+        }
+        pipe.hset(hashKey, { last_seen_at: nowIso, tags: newTagStr });
+      } else {
+        pipe.hset(hashKey, "last_seen_at", nowIso);
+      }
     }
   }
 
