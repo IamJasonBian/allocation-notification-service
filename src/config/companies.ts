@@ -234,4 +234,15 @@ export const companies: Company[] = [
   { boardToken: "imc",                      displayName: "IMC Trading",          description: "Market maker" },
   { boardToken: "jumptrading",              displayName: "Jump Trading",         description: "HFT" },
   { boardToken: "aqr",                      displayName: "AQR Capital",          description: "Quant asset manager" },
+  { boardToken: "millenniumadvisors",       displayName: "Millennium",           description: "Multi-strat hedge fund" },
+
+  // ════════════════════════════════════════
+  // Additional Companies
+  // ════════════════════════════════════════
+  { boardToken: "anthropic",                displayName: "Anthropic",            description: "AI safety and research" },
+  { boardToken: "vercel",                   displayName: "Vercel",               description: "Frontend cloud platform" },
+  { boardToken: "perplexity",               displayName: "Perplexity",           description: "AI search engine" },
+  { boardToken: "chime",                    displayName: "Chime",               description: "Neobank" },
+  { boardToken: "togetherai",               displayName: "Together AI",          description: "Open-source AI inference" },
+  { boardToken: "sambanovasystems",         displayName: "SambaNova",            description: "AI hardware + platform" },
 ];
