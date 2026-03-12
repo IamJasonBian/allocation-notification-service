@@ -63,18 +63,8 @@
   status = 200
 
 [[redirects]]
-  from = "/api/crawler/boards"
-  to = "/.netlify/functions/crawler-boards"
-  status = 200
-
-[[redirects]]
   from = "/api/crawler/jobs"
   to = "/.netlify/functions/crawler-jobs"
-  status = 200
-
-[[redirects]]
-  from = "/api/crawler/users"
-  to = "/.netlify/functions/crawler-users"
   status = 200
 
 [[redirects]]
