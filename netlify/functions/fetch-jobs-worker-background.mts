@@ -22,9 +22,24 @@ export default async (req: Request) => {
   const redis = getRedisClient();
   const allNotifications: JobNotification[] = [];
 
+  // Create crawl record
+  const crawlId = `crawl-${Date.now()}`;
+  const crawlNow = new Date().toISOString();
+
   try {
     await redis.ping();
     console.log("Redis connected");
+
+    await redis.hset(`crawl_exec:${crawlId}`, {
+      crawl_id: crawlId,
+      status: "running",
+      trigger: "scheduled",
+      started_at: crawlNow,
+      completed_at: "",
+      error: "",
+      stats: "",
+    });
+    await redis.sadd("idx:crawls", crawlId);
 
     // Load relevance filter tags
     const activeTags = await getAllActiveTags(redis);
@@ -42,6 +57,10 @@ export default async (req: Request) => {
     if (removedTokens.size > 0) {
       console.log(`Skipping ${removedTokens.size} removed companies: ${[...removedTokens].join(", ")}`);
     }
+
+    let totalNew = 0;
+    let totalUpdated = 0;
+    let totalRemoved = 0;
 
     for (const company of activeCompanies) {
       const atsType = company.atsType || "greenhouse";
@@ -69,6 +88,10 @@ export default async (req: Request) => {
       const { stats, notifications } = await diffAndUpdate(redis, company, jobsToStore, scoredMap);
       allNotifications.push(...notifications);
 
+      totalNew += stats.newCount;
+      totalUpdated += stats.updatedCount;
+      totalRemoved += stats.removedCount;
+
       console.log(`  ${company.boardToken}: new=${stats.newCount} updated=${stats.updatedCount} removed=${stats.removedCount} unchanged=${stats.unchangedCount}`);
 
       // Be polite to ATS APIs
@@ -89,6 +112,30 @@ export default async (req: Request) => {
     }
 
     console.log(`Done. Processed ${activeCompanies.length} companies, ${allNotifications.length} notifications`);
+
+    // Update crawl to success
+    const crawlStats = {
+      companies_processed: activeCompanies.length,
+      total_new: totalNew,
+      total_updated: totalUpdated,
+      total_removed: totalRemoved,
+      notifications_sent: allNotifications.length,
+    };
+    await redis.hset(`crawl_exec:${crawlId}`, {
+      status: "success",
+      completed_at: new Date().toISOString(),
+      stats: JSON.stringify(crawlStats),
+    });
+  } catch (crawlError: any) {
+    // Update crawl to failed
+    try {
+      await redis.hset(`crawl_exec:${crawlId}`, {
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error: crawlError.message,
+      });
+    } catch { /* best effort */ }
+    throw crawlError;
   } finally {
     await disconnectRedis();
   }
