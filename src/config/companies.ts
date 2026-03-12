@@ -253,4 +253,11 @@ export const companies: Company[] = [
   { boardToken: "otter",                    displayName: "Otter",                description: "AI meeting notes" },
   { boardToken: "monstro",                  displayName: "Monstro",              description: "AI platform" },
   { boardToken: "cherryventures",           displayName: "Cherry Ventures",      description: "VC-backed startup portfolio" },
+
+  // ── Lever companies ──
+  { boardToken: "matchgroup",               displayName: "Match Group",          description: "Dating apps (Tinder, Hinge)", atsType: "lever" },
+  { boardToken: "mistral",                  displayName: "Mistral AI",           description: "Open-weight LLMs",            atsType: "lever" },
+
+  // ── Ashby companies ──
+  { boardToken: "gaiafamily",               displayName: "Gaia Family",          description: "AI fintech",                  atsType: "ashby" },
 ];
