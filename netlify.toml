@@ -86,3 +86,8 @@
   from = "/api/agent-runs"
   to = "/.netlify/functions/agent-runs"
   status = 200
+
+[[redirects]]
+  from = "/api/crawler/crawls"
+  to = "/.netlify/functions/crawler-crawls"
+  status = 200

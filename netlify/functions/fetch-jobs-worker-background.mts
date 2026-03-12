@@ -7,7 +7,6 @@ import { getAllActiveTags } from "../../src/lib/tag-store.js";
 import { scoreJob } from "../../src/lib/relevance-scorer.js";
 import type { JobNotification } from "../../src/lib/types.js";
 import type { RelevanceResult } from "../../src/lib/relevance-scorer.js";
-import { randomUUID } from "crypto";
 
 /**
  * Background function (15-min timeout).
@@ -25,30 +24,24 @@ export default async (req: Request) => {
   const redis = getRedisClient();
   const allNotifications: JobNotification[] = [];
 
-  // Crawl run tracking
-  const runId = randomUUID();
-  const startTime = Date.now();
-  const startIso = new Date(startTime).toISOString();
-  let runStatus = "completed";
-  let runError = "";
-
-  let totalFetched = 0, totalRelevant = 0, totalNew = 0;
-  let totalUpdated = 0, totalRemoved = 0, totalUnchanged = 0;
-  let boardsOk = 0, boardsError = 0;
-  let activeCompaniesCount = 0;
+  // Create crawl record
+  const crawlId = `crawl-${Date.now()}`;
+  const crawlNow = new Date().toISOString();
 
   try {
     await redis.ping();
     console.log("Redis connected");
 
-    // Record run as started
-    await redis.hset(`crawl_run:${runId}`, {
-      run_id: runId,
-      started_at: startIso,
+    await redis.hset(`crawl_exec:${crawlId}`, {
+      crawl_id: crawlId,
       status: "running",
       trigger: "scheduled",
+      started_at: crawlNow,
+      completed_at: "",
+      error: "",
+      stats: "",
     });
-    await redis.zadd("idx:crawl_runs", String(startTime / 1000), runId);
+    await redis.sadd("idx:crawls", crawlId);
 
     // Load relevance filter tags
     const activeTags = await getAllActiveTags(redis);
@@ -59,14 +52,17 @@ export default async (req: Request) => {
       console.log("No relevance tags defined — storing all jobs");
     }
 
-    // Filter out companies that were archived/removed
+    // Filter out companies that were archived/removed via DELETE /api/companies/:token
     const removedSet = await redis.smembers("meta:removed_companies");
     const removedTokens = new Set(removedSet);
     const activeCompanies = companies.filter((c) => !removedTokens.has(c.boardToken));
-    activeCompaniesCount = activeCompanies.length;
     if (removedTokens.size > 0) {
       console.log(`Skipping ${removedTokens.size} removed companies: ${[...removedTokens].join(", ")}`);
     }
+
+    let totalNew = 0;
+    let totalUpdated = 0;
+    let totalRemoved = 0;
 
     for (const company of activeCompanies) {
       const atsType = company.atsType || "greenhouse";
@@ -76,7 +72,6 @@ export default async (req: Request) => {
         const apiJobs = await fetchJobs(company);
         if (apiJobs.length === 0) {
           console.log(`  No jobs returned for ${company.boardToken}, skipping`);
-          boardsOk++;
           continue;
         }
 
@@ -96,17 +91,12 @@ export default async (req: Request) => {
         const { stats, notifications } = await diffAndUpdate(redis, company, jobsToStore, scoredMap);
         allNotifications.push(...notifications);
 
-        totalFetched += apiJobs.length;
-        totalRelevant += jobsToStore.length;
         totalNew += stats.newCount;
         totalUpdated += stats.updatedCount;
         totalRemoved += stats.removedCount;
-        totalUnchanged += stats.unchangedCount;
-        boardsOk++;
 
         console.log(`  ${company.boardToken}: new=${stats.newCount} updated=${stats.updatedCount} removed=${stats.removedCount} unchanged=${stats.unchangedCount}`);
       } catch (companyErr: any) {
-        boardsError++;
         console.error(`  Error processing ${company.boardToken}: ${companyErr.message}`);
       }
 
@@ -128,31 +118,31 @@ export default async (req: Request) => {
     }
 
     console.log(`Done. Processed ${activeCompanies.length} companies, ${allNotifications.length} notifications`);
-  } catch (err: any) {
-    runStatus = "failed";
-    runError = err.message;
-    console.error("Crawl run failed:", err);
-  } finally {
-    // Finalize crawl run record
-    const endTime = Date.now();
+
+    // Update crawl to success
+    const crawlStats = {
+      companies_processed: activeCompanies.length,
+      total_new: totalNew,
+      total_updated: totalUpdated,
+      total_removed: totalRemoved,
+      notifications_sent: allNotifications.length,
+    };
+    await redis.hset(`crawl_exec:${crawlId}`, {
+      status: "success",
+      completed_at: new Date().toISOString(),
+      stats: JSON.stringify(crawlStats),
+    });
+  } catch (crawlError: any) {
+    // Update crawl to failed
     try {
-      await redis.hset(`crawl_run:${runId}`, {
-        completed_at: new Date(endTime).toISOString(),
-        status: runStatus,
-        boards_total: String(activeCompaniesCount),
-        boards_ok: String(boardsOk),
-        boards_error: String(boardsError),
-        jobs_fetched: String(totalFetched),
-        jobs_relevant: String(totalRelevant),
-        jobs_new: String(totalNew),
-        jobs_updated: String(totalUpdated),
-        jobs_removed: String(totalRemoved),
-        jobs_unchanged: String(totalUnchanged),
-        duration_ms: String(endTime - startTime),
-        ...(runError ? { error: runError } : {}),
+      await redis.hset(`crawl_exec:${crawlId}`, {
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error: crawlError.message,
       });
     } catch { /* best effort */ }
-
+    throw crawlError;
+  } finally {
     await disconnectRedis();
   }
 };

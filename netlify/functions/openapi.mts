@@ -260,11 +260,7 @@ const spec = {
       post: {
         tags: ["Agent Runs"],
         summary: "Enqueue, claim, requeue, or reap agent runs",
-        description: `Multiplexed via the \`action\` field:
-- **No action** (default): Enqueue a new job for application. Requires job_id, board, resume_id.
-- **\`claim\`**: Atomically pick up the oldest pending run from the queue. Requires worker_id. Returns 204 if queue is empty.
-- **\`requeue\`**: Reset a failed/stale run back to pending with incremented attempt. Requires execution_id.
-- **\`reap\`**: Find all running jobs with no heartbeat for timeout_ms (default 5 min) and requeue them.`,
+        description: "Multiplexed via the `action` field:\n- **No action** (default): Enqueue a new job for application. Requires job_id, board, resume_id.\n- **`claim`**: Atomically pick up the oldest pending run from the queue. Requires worker_id. Returns 204 if queue is empty.\n- **`requeue`**: Reset a failed/stale run back to pending with incremented attempt. Requires execution_id.\n- **`reap`**: Find all running jobs with no heartbeat for timeout_ms (default 5 min) and requeue them.",
         requestBody: {
           required: true,
           content: {
