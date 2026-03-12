@@ -234,4 +234,141 @@ export const companies: Company[] = [
   { boardToken: "imc",                      displayName: "IMC Trading",          description: "Market maker" },
   { boardToken: "jumptrading",              displayName: "Jump Trading",         description: "HFT" },
   { boardToken: "aqr",                      displayName: "AQR Capital",          description: "Quant asset manager" },
+
+  // ════════════════════════════════════════
+  // NYC Fintech (Ashby)
+  // ════════════════════════════════════════
+  { boardToken: "plaid",        displayName: "Plaid",            description: "Financial data API", atsType: "ashby" },
+  { boardToken: "paxos",        displayName: "Paxos",            description: "Blockchain infrastructure, stablecoin", atsType: "ashby" },
+  { boardToken: "socure",       displayName: "Socure",           description: "Identity verification & fraud prevention", atsType: "ashby" },
+  { boardToken: "persona",      displayName: "Persona",          description: "Identity verification platform", atsType: "ashby" },
+  { boardToken: "lemonade",     displayName: "Lemonade",         description: "AI-powered insurance", atsType: "ashby" },
+  { boardToken: "column",       displayName: "Column",           description: "Developer-first banking infrastructure", atsType: "ashby" },
+  { boardToken: "novo",         displayName: "Novo",             description: "Small business banking", atsType: "ashby" },
+
+  // ════════════════════════════════════════
+  // NYC Fintech (Greenhouse)
+  // ════════════════════════════════════════
+  { boardToken: "lithic",       displayName: "Lithic",           description: "Card issuing API" },
+  { boardToken: "betterment",   displayName: "Betterment",       description: "Robo-advisor, wealth management" },
+  { boardToken: "blend",        displayName: "Blend",            description: "Lending & banking cloud platform" },
+  { boardToken: "virtu",        displayName: "Virtu Financial",  description: "Electronic market maker" },
+  { boardToken: "chime",        displayName: "Chime",            description: "Neobank, mobile banking" },
+  { boardToken: "sofi",         displayName: "SoFi",             description: "Digital finance, lending, investing" },
+  { boardToken: "adyen",        displayName: "Adyen",            description: "Global payments platform" },
+  { boardToken: "carta",        displayName: "Carta",            description: "Equity management, cap tables" },
+
+  // ════════════════════════════════════════
+  // NYC AI (Ashby)
+  // ════════════════════════════════════════
+  { boardToken: "harvey",       displayName: "Harvey",           description: "AI for law", atsType: "ashby" },
+  { boardToken: "writer",       displayName: "Writer",           description: "Enterprise AI writing platform", atsType: "ashby" },
+
+  // ════════════════════════════════════════
+  // NYC AI (Greenhouse)
+  // ════════════════════════════════════════
+  { boardToken: "observeai",    displayName: "Observe.AI",       description: "AI for contact centers" },
+
+  // ════════════════════════════════════════
+  // NYC Hedge Funds / Buy-Side (Greenhouse)
+  // ════════════════════════════════════════
+  { boardToken: "schonfeld",              displayName: "Schonfeld",            description: "Multi-strategy hedge fund" },
+  { boardToken: "exoduspoint",            displayName: "ExodusPoint",          description: "Multi-strategy hedge fund" },
+
+  // ════════════════════════════════════════
+  // NYC PE / Asset Management (Greenhouse)
+  // ════════════════════════════════════════
+  { boardToken: "apollo",                 displayName: "Apollo",               description: "PE, credit, real assets" },
+  { boardToken: "warburgpincusllc",       displayName: "Warburg Pincus",       description: "Global growth PE" },
+
+  // ════════════════════════════════════════
+  // NYC Fintech / Payments (Greenhouse)
+  // ════════════════════════════════════════
+  { boardToken: "payoneer",               displayName: "Payoneer",             description: "Cross-border payments" },
+  { boardToken: "billcom",                displayName: "Bill.com",             description: "AP/AR automation" },
+  { boardToken: "toast",                  displayName: "Toast",                description: "Restaurant fintech" },
+  { boardToken: "earnin",                 displayName: "Earnin",               description: "Earned wage access" },
+  { boardToken: "n26",                    displayName: "N26",                  description: "Digital bank" },
+  { boardToken: "justworks",              displayName: "Justworks",            description: "HR & payroll platform" },
+  { boardToken: "forter",                 displayName: "Forter",               description: "Fraud prevention" },
+  { boardToken: "nubank",                 displayName: "Nubank",               description: "Digital bank" },
+  { boardToken: "iex",                    displayName: "IEX",                  description: "Stock exchange" },
+
+  // ════════════════════════════════════════
+  // NYC Fintech (Ashby)
+  // ════════════════════════════════════════
+  { boardToken: "nerdwallet",             displayName: "NerdWallet",           description: "Personal finance", atsType: "ashby" },
+  { boardToken: "unit",                   displayName: "Unit",                 description: "Banking-as-a-service", atsType: "ashby" },
+
+  // ════════════════════════════════════════
+  // NYC Fintech (Lever)
+  // ════════════════════════════════════════
+  { boardToken: "olo",                    displayName: "Olo",                  description: "Restaurant ordering platform", atsType: "lever" },
+  { boardToken: "compasslexecon",         displayName: "Compass Lexecon",      description: "Economic consulting", atsType: "lever" },
+
+  // ════════════════════════════════════════
+  // NYC Crypto / Blockchain (Greenhouse)
+  // ════════════════════════════════════════
+  { boardToken: "galaxydigitalservices",  displayName: "Galaxy Digital",       description: "Crypto financial services" },
+  { boardToken: "blockchain",             displayName: "Blockchain.com",       description: "Crypto exchange" },
+  { boardToken: "ripple",                 displayName: "Ripple",               description: "Crypto payments" },
+  { boardToken: "gemini",                 displayName: "Gemini",               description: "Crypto exchange" },
+  { boardToken: "bitgo",                  displayName: "BitGo",                description: "Crypto custody" },
+  { boardToken: "aptoslabs",              displayName: "Aptos Labs",           description: "L1 blockchain" },
+
+  // ════════════════════════════════════════
+  // NYC Crypto (Ashby)
+  // ════════════════════════════════════════
+  { boardToken: "opensea",                displayName: "OpenSea",              description: "NFT marketplace", atsType: "ashby" },
+  { boardToken: "uniswap",                displayName: "Uniswap",             description: "DEX protocol", atsType: "ashby" },
+
+  // ════════════════════════════════════════
+  // NYC Tech (Greenhouse)
+  // ════════════════════════════════════════
+  { boardToken: "squarespace",            displayName: "Squarespace",          description: "Website builder" },
+  { boardToken: "grammarly",              displayName: "Grammarly",            description: "Writing AI" },
+  { boardToken: "jfrog",                  displayName: "JFrog",                description: "DevOps platform" },
+  { boardToken: "celonis",                displayName: "Celonis",              description: "Process mining" },
+  { boardToken: "zocdoc",                 displayName: "Zocdoc",               description: "Healthcare booking" },
+  { boardToken: "digitalocean98",         displayName: "DigitalOcean",         description: "Cloud infrastructure" },
+  { boardToken: "gersonlehrmangroup",     displayName: "GLG",                  description: "Expert network" },
+  { boardToken: "urbancompass",           displayName: "Compass",              description: "Real estate tech" },
+  { boardToken: "oscar",                  displayName: "Oscar Health",         description: "Health insurance tech" },
+  { boardToken: "pagerduty",              displayName: "PagerDuty",            description: "Incident management" },
+  { boardToken: "gitlab",                 displayName: "GitLab",               description: "DevOps platform" },
+  { boardToken: "samsara",                displayName: "Samsara",              description: "IoT platform" },
+  { boardToken: "lattice",                displayName: "Lattice",              description: "HR platform" },
+  { boardToken: "dataiku",                displayName: "Dataiku",              description: "Data science platform" },
+  { boardToken: "braze",                  displayName: "Braze",                description: "Marketing automation" },
+  { boardToken: "seatgeek",               displayName: "SeatGeek",             description: "Ticketing platform" },
+  { boardToken: "workato",                displayName: "Workato",              description: "Integration platform" },
+  { boardToken: "headway",                displayName: "Headway",              description: "Mental health platform" },
+  { boardToken: "springhealth66",         displayName: "Spring Health",        description: "Mental health platform" },
+  { boardToken: "intercom",               displayName: "Intercom",             description: "Customer messaging" },
+  { boardToken: "abnormalsecurity",       displayName: "Abnormal Security",    description: "Email security AI" },
+  { boardToken: "snorkelai",              displayName: "Snorkel AI",           description: "Data-centric AI" },
+  { boardToken: "securityscorecard",      displayName: "SecurityScorecard",    description: "Cybersecurity ratings" },
+  { boardToken: "newrelic",               displayName: "New Relic",            description: "Observability" },
+  { boardToken: "moveworks",              displayName: "Moveworks",            description: "AI for IT" },
+  { boardToken: "roku",                   displayName: "Roku",                 description: "Streaming platform" },
+  { boardToken: "opendoor",               displayName: "Opendoor",             description: "Real estate tech" },
+  { boardToken: "collectivehealth",       displayName: "Collective Health",    description: "Health insurance" },
+  { boardToken: "liveperson",             displayName: "LivePerson",           description: "Conversational AI" },
+  { boardToken: "figureai",               displayName: "Figure AI",            description: "Humanoid robotics" },
+
+  // ════════════════════════════════════════
+  // NYC Tech (Ashby)
+  // ════════════════════════════════════════
+  { boardToken: "snowflake",              displayName: "Snowflake",            description: "Cloud data platform", atsType: "ashby" },
+  { boardToken: "benchling",              displayName: "Benchling",            description: "Biotech R&D platform", atsType: "ashby" },
+  { boardToken: "foursquare",             displayName: "Foursquare",           description: "Location intelligence", atsType: "ashby" },
+  { boardToken: "uipath",                 displayName: "UiPath",               description: "RPA platform", atsType: "ashby" },
+
+  // ════════════════════════════════════════
+  // NYC Tech (Lever)
+  // ════════════════════════════════════════
+  { boardToken: "ro",                     displayName: "Ro",                   description: "Telehealth platform", atsType: "lever" },
+  { boardToken: "palantir",               displayName: "Palantir",             description: "Data analytics platform", atsType: "lever" },
+  { boardToken: "contentsquare",          displayName: "Contentsquare",        description: "Digital analytics", atsType: "lever" },
+  { boardToken: "matchgroup",             displayName: "Match Group",          description: "Dating platforms", atsType: "lever" },
 ];

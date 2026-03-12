@@ -5,7 +5,7 @@ const spec = {
   info: {
     title: "Allocation Notification Service API",
     description: "Job discovery and notification service. Polls Greenhouse, Lever, and Ashby boards, diffs against Redis, sends Slack alerts. Covers tech, PE (buy side), equity research & investment banking (sell side).",
-    version: "1.2.0",
+    version: "1.4.0",
   },
   servers: [
     { url: "https://route-agent.netlify.app", description: "Production" },
@@ -16,6 +16,9 @@ const spec = {
     { name: "Jobs", description: "Job search, filtering, and new-job feeds" },
     { name: "Redis", description: "Direct Redis access — keys, values, individual job records" },
     { name: "Resume A/B Testing", description: "Resume variant statistics" },
+    { name: "Crawler", description: "Crawl execution, job status updates, and run history" },
+    { name: "Tags", description: "Relevance tag management (beam search filter)" },
+    { name: "Agent Runs", description: "Auto-apply worker execution tracking" },
     { name: "Debug", description: "Debug & diagnostics" },
   ],
   paths: {
@@ -106,6 +109,248 @@ const spec = {
             description: "Search results",
             content: { "application/json": { schema: { $ref: "#/components/schemas/SearchResponse" } } },
           },
+        },
+      },
+    },
+
+    // ── Crawler ──
+    "/api/crawler/jobs": {
+      get: {
+        tags: ["Crawler"],
+        summary: "List jobs or fetch crawl runs",
+        description: "Returns all crawler jobs from Redis (new schema). Use `runs_for` param to get crawl run history instead.",
+        parameters: [
+          { name: "status", in: "query", schema: { type: "string", enum: ["active", "removed", "applying", "applied"] }, description: "Filter by job status" },
+          { name: "board", in: "query", schema: { type: "string" }, description: "Filter by board token" },
+          { name: "tag", in: "query", schema: { type: "string" }, description: "Filter by tag" },
+          { name: "runs_for", in: "query", schema: { type: "string" }, description: "If present, returns crawl run history instead of jobs" },
+        ],
+        responses: {
+          "200": {
+            description: "Job list or crawl run list",
+            content: { "application/json": { schema: { oneOf: [
+              { $ref: "#/components/schemas/CrawlerJobListResponse" },
+              { type: "array", items: { $ref: "#/components/schemas/CrawlRun" } },
+            ] } } },
+          },
+        },
+      },
+      patch: {
+        tags: ["Crawler"],
+        summary: "Update job status",
+        description: "Sets the status of a specific job. Used by the auto-apply service to mark jobs as 'applying' (in progress) or 'applied' (done).",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["board", "job_id", "status"],
+                properties: {
+                  board: { type: "string", example: "openai", description: "Board token" },
+                  job_id: { type: "string", example: "12345", description: "Job ID" },
+                  status: { type: "string", enum: ["active", "removed", "applying", "applied"], description: "New status" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Status updated",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                ok: { type: "boolean" },
+                board: { type: "string" },
+                job_id: { type: "string" },
+                status: { type: "string" },
+              },
+            } } },
+          },
+          "400": { description: "Missing or invalid parameters" },
+          "404": { description: "Job not found" },
+        },
+      },
+      post: {
+        tags: ["Crawler"],
+        summary: "Trigger a crawl",
+        description: "Triggers a full crawl of all active boards with beam search relevance filtering. Creates a crawl run record with stats.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["action"],
+                properties: {
+                  action: { type: "string", enum: ["retrieve"], description: "Must be 'retrieve'" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Crawl results with run ID and per-board stats",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/CrawlTriggerResponse" } } },
+          },
+        },
+      },
+    },
+
+    // ── Tags ──
+    "/api/tags": {
+      get: {
+        tags: ["Tags"],
+        summary: "List active tags or get single tag",
+        description: "Returns all enabled relevance tags. Use ?name=X for a single tag, add &history=true for version history.",
+        parameters: [
+          { name: "name", in: "query", schema: { type: "string" }, description: "Tag name (optional)" },
+          { name: "history", in: "query", schema: { type: "string", enum: ["true"] }, description: "Include version history" },
+        ],
+        responses: { "200": { description: "Tag list or single tag" } },
+      },
+      post: {
+        tags: ["Tags"],
+        summary: "Create a tag",
+        requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["title", "description"], properties: { title: { type: "string" }, description: { type: "string" }, threshold: { type: "number" }, enabled: { type: "boolean" } } } } } },
+        responses: { "201": { description: "Tag created" }, "409": { description: "Tag already exists" } },
+      },
+      put: {
+        tags: ["Tags"],
+        summary: "Update a tag",
+        requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["title"], properties: { title: { type: "string" }, description: { type: "string" }, threshold: { type: "number" }, enabled: { type: "boolean" } } } } } },
+        responses: { "200": { description: "Tag updated" }, "404": { description: "Tag not found" } },
+      },
+      delete: {
+        tags: ["Tags"],
+        summary: "Disable (soft-delete) a tag",
+        parameters: [{ name: "name", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Tag disabled" }, "404": { description: "Tag not found" } },
+      },
+    },
+
+    // ── Agent Runs ──
+    "/api/agent-runs": {
+      get: {
+        tags: ["Agent Runs"],
+        summary: "List agent runs or get single run",
+        description: "Returns agent run execution records. Use `?id=X` for a single run, `?board=X&job_id=Y` for runs on a specific job, or `?status=X` to filter by status.",
+        parameters: [
+          { name: "id", in: "query", schema: { type: "string" }, description: "Execution ID (returns single run)" },
+          { name: "board", in: "query", schema: { type: "string" }, description: "Board token (use with job_id)" },
+          { name: "job_id", in: "query", schema: { type: "string" }, description: "Job ID (use with board)" },
+          { name: "status", in: "query", schema: { type: "string", enum: ["pending", "running", "completed", "failed"] }, description: "Filter by status" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 100 }, description: "Max results" },
+          { name: "queue_depth", in: "query", schema: { type: "string", enum: ["true"] }, description: "Return queue depth instead of runs" },
+        ],
+        responses: {
+          "200": {
+            description: "Agent run list, single run, or queue depth",
+            content: { "application/json": { schema: { oneOf: [
+              { $ref: "#/components/schemas/AgentRunListResponse" },
+              { $ref: "#/components/schemas/AgentRun" },
+              { type: "object", properties: { queue_depth: { type: "integer" } } },
+            ] } } },
+          },
+          "404": { description: "Run not found (when using ?id=)" },
+        },
+      },
+      post: {
+        tags: ["Agent Runs"],
+        summary: "Enqueue, claim, requeue, or reap agent runs",
+        description: "Multiplexed via the `action` field:\n- **No action** (default): Enqueue a new job for application. Requires job_id, board, resume_id.\n- **`claim`**: Atomically pick up the oldest pending run from the queue. Requires worker_id. Returns 204 if queue is empty.\n- **`requeue`**: Reset a failed/stale run back to pending with incremented attempt. Requires execution_id.\n- **`reap`**: Find all running jobs with no heartbeat for timeout_ms (default 5 min) and requeue them.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  action: { type: "string", enum: ["claim", "requeue", "reap"], description: "Queue action. Omit to enqueue a new run." },
+                  job_id: { type: "string", description: "Job ID (for enqueue)" },
+                  board: { type: "string", description: "Board token (for enqueue)" },
+                  resume_id: { type: "string", description: "Resume variant ID (for enqueue)" },
+                  worker_id: { type: "string", description: "Worker ID (for claim)" },
+                  execution_id: { type: "string", format: "uuid", description: "Execution ID (for requeue)" },
+                  timeout_ms: { type: "integer", default: 300000, description: "Stale timeout in ms (for reap)" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Claimed run, requeued run, or reap results",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AgentRun" } } },
+          },
+          "201": {
+            description: "Agent run enqueued",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AgentRun" } } },
+          },
+          "204": { description: "No pending runs in queue (claim returned empty)" },
+          "400": { description: "Missing required fields" },
+          "404": { description: "Agent run not found (requeue)" },
+        },
+      },
+      patch: {
+        tags: ["Agent Runs"],
+        summary: "Update an agent run",
+        description: "Updates status, worker_id, error, or artifacts of an agent run. Automatically sets started_at when status becomes 'running', and completed_at when 'completed' or 'failed'.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["execution_id"],
+                properties: {
+                  execution_id: { type: "string", format: "uuid", description: "Execution ID" },
+                  status: { type: "string", enum: ["pending", "running", "completed", "failed"], description: "New status" },
+                  worker_id: { type: "string", description: "Worker that picked up this run" },
+                  error: { type: "string", description: "Error message (on failure)" },
+                  artifacts: { type: "object", description: "Result artifacts (e.g. confirmation URL)" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Agent run updated",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AgentRun" } } },
+          },
+          "400": { description: "Missing or invalid parameters" },
+          "404": { description: "Agent run not found" },
+        },
+      },
+      put: {
+        tags: ["Agent Runs"],
+        summary: "Heartbeat an agent run",
+        description: "Records a heartbeat from a worker processing this run. Updates heartbeat_at and worker_id.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["execution_id", "worker_id"],
+                properties: {
+                  execution_id: { type: "string", format: "uuid", description: "Execution ID" },
+                  worker_id: { type: "string", description: "Worker ID sending heartbeat" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Heartbeat recorded",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AgentRun" } } },
+          },
+          "400": { description: "Missing execution_id or worker_id" },
+          "404": { description: "Agent run not found" },
         },
       },
     },
@@ -377,7 +622,86 @@ const spec = {
           firstSeenAt: { type: "string", format: "date-time" },
           lastSeenAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
-          status: { type: "string", enum: ["active", "removed"] },
+          status: { type: "string", enum: ["active", "removed", "applying", "applied"] },
+        },
+      },
+      CrawlerJobListResponse: {
+        type: "object",
+        properties: {
+          count: { type: "integer" },
+          jobs: { type: "array", items: { $ref: "#/components/schemas/CrawlerJobRecord" } },
+        },
+      },
+      CrawlerJobRecord: {
+        type: "object",
+        properties: {
+          job_id: { type: "string" },
+          board: { type: "string" },
+          title: { type: "string" },
+          url: { type: "string" },
+          location: { type: "string" },
+          department: { type: "string" },
+          tags: { type: "array", items: { type: "string" } },
+          status: { type: "string", enum: ["active", "removed", "applying", "applied"] },
+          discovered_at: { type: "string", format: "date-time" },
+          updated_at: { type: "string", format: "date-time" },
+        },
+      },
+      CrawlRun: {
+        type: "object",
+        properties: {
+          run_id: { type: "string", format: "uuid" },
+          started_at: { type: "string", format: "date-time" },
+          completed_at: { type: "string", format: "date-time", nullable: true },
+          status: { type: "string", enum: ["running", "completed", "failed"] },
+          trigger: { type: "string", enum: ["scheduled", "manual"] },
+          boards_total: { type: "integer" },
+          boards_ok: { type: "integer" },
+          boards_error: { type: "integer" },
+          jobs_fetched: { type: "integer" },
+          jobs_relevant: { type: "integer" },
+          jobs_new: { type: "integer" },
+          jobs_updated: { type: "integer" },
+          jobs_removed: { type: "integer" },
+          jobs_unchanged: { type: "integer" },
+          duration_ms: { type: "integer" },
+          error: { type: "string", nullable: true },
+        },
+      },
+      CrawlTriggerResponse: {
+        type: "object",
+        properties: {
+          action: { type: "string" },
+          run_id: { type: "string", format: "uuid" },
+          boards: { type: "integer" },
+          results: { type: "array", items: { type: "object" } },
+          timestamp: { type: "string", format: "date-time" },
+        },
+      },
+      AgentRun: {
+        type: "object",
+        properties: {
+          execution_id: { type: "string", format: "uuid" },
+          job_id: { type: "string" },
+          board: { type: "string" },
+          resume_id: { type: "string" },
+          status: { type: "string", enum: ["pending", "running", "completed", "failed"] },
+          attempt: { type: "integer" },
+          worker_id: { type: "string", nullable: true },
+          heartbeat_at: { type: "string", format: "date-time", nullable: true },
+          started_at: { type: "string", format: "date-time", nullable: true },
+          completed_at: { type: "string", format: "date-time", nullable: true },
+          created_at: { type: "string", format: "date-time" },
+          updated_at: { type: "string", format: "date-time" },
+          error: { type: "string", nullable: true },
+          artifacts: { type: "object", nullable: true },
+        },
+      },
+      AgentRunListResponse: {
+        type: "object",
+        properties: {
+          count: { type: "integer" },
+          runs: { type: "array", items: { $ref: "#/components/schemas/AgentRun" } },
         },
       },
       RedisJobRecord: {
@@ -392,7 +716,7 @@ const spec = {
           url: { type: "string" },
           department: { type: "string" },
           location: { type: "string" },
-          status: { type: "string", enum: ["active", "removed"] },
+          status: { type: "string", enum: ["active", "removed", "applying", "applied"] },
           first_seen_at: { type: "string", format: "date-time" },
           last_seen_at: { type: "string", format: "date-time" },
           updated_at: { type: "string", format: "date-time" },

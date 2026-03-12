@@ -13,10 +13,12 @@ import type { RelevanceResult } from "../../src/lib/relevance-scorer.js";
  * Named with -background suffix so Netlify returns 202 immediately.
  *
  * Processes all tracked companies:
- * 1. Fetches jobs from Greenhouse API
- * 2. Diffs against Redis state
- * 3. Updates Redis indexes
- * 4. Sends SMS digest of new/removed jobs
+ * 1. Fetches jobs from ATS APIs
+ * 2. Scores against relevance tags (beam search filter)
+ * 3. Diffs against Redis state
+ * 4. Updates Redis indexes
+ * 5. Sends SMS digest of new/removed jobs
+ * 6. Records crawl run stats
  */
 export default async (req: Request) => {
   const redis = getRedisClient();
@@ -66,33 +68,37 @@ export default async (req: Request) => {
       const atsType = company.atsType || "greenhouse";
       console.log(`Processing ${company.displayName} (${company.boardToken}, ${atsType})...`);
 
-      const apiJobs = await fetchJobs(company);
-      if (apiJobs.length === 0) {
-        console.log(`  No jobs returned for ${company.boardToken}, skipping`);
-        continue;
+      try {
+        const apiJobs = await fetchJobs(company);
+        if (apiJobs.length === 0) {
+          console.log(`  No jobs returned for ${company.boardToken}, skipping`);
+          continue;
+        }
+
+        // Beam search relevance filter
+        let jobsToStore = apiJobs;
+        let scoredMap: Map<string, RelevanceResult> | undefined;
+        if (scoringEnabled) {
+          scoredMap = new Map();
+          jobsToStore = apiJobs.filter((job) => {
+            const result = scoreJob(job, activeTags);
+            scoredMap!.set(job.id, result);
+            return result.relevant;
+          });
+          console.log(`  ${company.boardToken}: ${apiJobs.length} fetched → ${jobsToStore.length} relevant (${apiJobs.length - jobsToStore.length} filtered)`);
+        }
+
+        const { stats, notifications } = await diffAndUpdate(redis, company, jobsToStore, scoredMap);
+        allNotifications.push(...notifications);
+
+        totalNew += stats.newCount;
+        totalUpdated += stats.updatedCount;
+        totalRemoved += stats.removedCount;
+
+        console.log(`  ${company.boardToken}: new=${stats.newCount} updated=${stats.updatedCount} removed=${stats.removedCount} unchanged=${stats.unchangedCount}`);
+      } catch (companyErr: any) {
+        console.error(`  Error processing ${company.boardToken}: ${companyErr.message}`);
       }
-
-      // Beam search relevance filter
-      let jobsToStore = apiJobs;
-      let scoredMap: Map<string, RelevanceResult> | undefined;
-      if (scoringEnabled) {
-        scoredMap = new Map();
-        jobsToStore = apiJobs.filter((job) => {
-          const result = scoreJob(job, activeTags);
-          scoredMap!.set(job.id, result);
-          return result.relevant;
-        });
-        console.log(`  ${company.boardToken}: ${apiJobs.length} fetched → ${jobsToStore.length} relevant (${apiJobs.length - jobsToStore.length} filtered)`);
-      }
-
-      const { stats, notifications } = await diffAndUpdate(redis, company, jobsToStore, scoredMap);
-      allNotifications.push(...notifications);
-
-      totalNew += stats.newCount;
-      totalUpdated += stats.updatedCount;
-      totalRemoved += stats.removedCount;
-
-      console.log(`  ${company.boardToken}: new=${stats.newCount} updated=${stats.updatedCount} removed=${stats.removedCount} unchanged=${stats.unchangedCount}`);
 
       // Be polite to ATS APIs
       await new Promise((resolve) => setTimeout(resolve, 500));

@@ -4,6 +4,7 @@ import type { UnifiedJob, JobNotification, DiffStats } from "./types.js";
 import type { RelevanceResult } from "./relevance-scorer.js";
 import { normalizeLocation, normalizeDepartment } from "./normalize.js";
 import { extractTags } from "./tags.js";
+import { getCompanySectors } from "../config/sectors.js";
 import { createHash } from "crypto";
 
 const REMOVED_TTL_DAYS = 90;
@@ -48,6 +49,10 @@ export async function diffAndUpdate(
     const tags = scored && scored.matchedTags.length > 0
       ? new Set(scored.matchedTags)
       : extractTags(title, dept);
+    // Merge company-level sector tags (e.g. "finance")
+    for (const sector of getCompanySectors(boardToken)) {
+      tags.add(sector);
+    }
     const normLoc = normalizeLocation(locationRaw);
     const normDept = normalizeDepartment(dept);
 
@@ -104,6 +109,9 @@ export async function diffAndUpdate(
       const oldTags = ((await r.hget(hashKey, "tags")) || "").split(",").filter(Boolean);
       const oldNormDept = normalizeDepartment(oldDept);
       const oldNormLoc = normalizeLocation(oldLoc);
+      // Preserve user-set statuses (applying, applied) — don't overwrite
+      const existingStatus = (await r.hget(hashKey, "status")) || "active";
+      const preserveStatus = existingStatus === "applying" || existingStatus === "applied";
 
       if (oldNormDept !== normDept) pipe.srem(`idx:dept:${oldNormDept}`, compositeKey);
       if (oldNormLoc !== normLoc) pipe.srem(`idx:location:${oldNormLoc}`, compositeKey);
@@ -111,38 +119,60 @@ export async function diffAndUpdate(
         if (!tags.has(oldTag)) pipe.srem(`idx:tag:${oldTag}`, compositeKey);
       }
 
-      pipe.hset(hashKey, {
+      const updateFields: Record<string, string> = {
         title,
         url,
         department: dept,
         location: locationRaw,
-        status: "active",
         last_seen_at: nowIso,
         updated_at: updated,
         content_hash: hash,
         tags: [...tags].sort().join(","),
-      });
+      };
+      // Only reset to active if status wasn't set by agent/user
+      if (!preserveStatus) {
+        updateFields.status = "active";
+      }
+      pipe.hset(hashKey, updateFields);
 
       pipe.sadd(`idx:dept:${normDept}`, compositeKey);
       pipe.sadd(`idx:location:${normLoc}`, compositeKey);
-      pipe.sadd("idx:status:active", compositeKey);
+      if (!preserveStatus) {
+        pipe.sadd("idx:status:active", compositeKey);
+      }
       for (const tag of tags) {
         pipe.sadd(`idx:tag:${tag}`, compositeKey);
       }
     } else {
       // ── UNCHANGED ──
       stats.unchangedCount++;
-      pipe.hset(hashKey, "last_seen_at", nowIso);
+      // Re-sync tags (picks up new sector tags, tag logic changes)
+      const oldTagStr = (await r.hget(hashKey, "tags")) || "";
+      const newTagStr = [...tags].sort().join(",");
+      if (oldTagStr !== newTagStr) {
+        const oldTags = oldTagStr.split(",").filter(Boolean);
+        for (const oldTag of oldTags) {
+          if (!tags.has(oldTag)) pipe.srem(`idx:tag:${oldTag}`, compositeKey);
+        }
+        for (const tag of tags) {
+          pipe.sadd(`idx:tag:${tag}`, compositeKey);
+        }
+        pipe.hset(hashKey, { last_seen_at: nowIso, tags: newTagStr });
+      } else {
+        pipe.hset(hashKey, "last_seen_at", nowIso);
+      }
     }
   }
 
   // ── Detect REMOVED jobs ──
   const companyJobs = await r.smembers(`idx:company:${boardToken}`);
   const activeJobs = await r.smembers("idx:status:active");
-  const activeSet = new Set(activeJobs);
+  const applyingJobs = await r.smembers("idx:status:applying");
+  const appliedJobs = await r.smembers("idx:status:applied");
+  const liveSet = new Set([...activeJobs, ...applyingJobs, ...appliedJobs]);
 
   for (const compositeKey of companyJobs) {
-    if (!activeSet.has(compositeKey)) continue;
+    if (!liveSet.has(compositeKey)) continue;
     if (apiJobIds.has(compositeKey)) continue;
 
     stats.removedCount++;
