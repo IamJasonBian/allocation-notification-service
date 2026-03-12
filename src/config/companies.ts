@@ -245,4 +245,12 @@ export const companies: Company[] = [
   { boardToken: "chime",                    displayName: "Chime",               description: "Neobank" },
   { boardToken: "togetherai",               displayName: "Together AI",          description: "Open-source AI inference" },
   { boardToken: "sambanovasystems",         displayName: "SambaNova",            description: "AI hardware + platform" },
+
+  // ── Discovered from job_runs:index (Chrome tabs) ──
+  { boardToken: "bitgo",                    displayName: "BitGo",                description: "Crypto custody + infrastructure" },
+  { boardToken: "galaxydigitalservices",    displayName: "Galaxy Digital",       description: "Crypto trading + asset mgmt" },
+  { boardToken: "falconx",                  displayName: "FalconX",              description: "Institutional crypto trading" },
+  { boardToken: "otter",                    displayName: "Otter",                description: "AI meeting notes" },
+  { boardToken: "monstro",                  displayName: "Monstro",              description: "AI platform" },
+  { boardToken: "cherryventures",           displayName: "Cherry Ventures",      description: "VC-backed startup portfolio" },
 ];
