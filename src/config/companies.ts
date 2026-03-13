@@ -234,4 +234,30 @@ export const companies: Company[] = [
   { boardToken: "imc",                      displayName: "IMC Trading",          description: "Market maker" },
   { boardToken: "jumptrading",              displayName: "Jump Trading",         description: "HFT" },
   { boardToken: "aqr",                      displayName: "AQR Capital",          description: "Quant asset manager" },
+  { boardToken: "millenniumadvisors",       displayName: "Millennium",           description: "Multi-strat hedge fund" },
+
+  // ════════════════════════════════════════
+  // Additional Companies
+  // ════════════════════════════════════════
+  { boardToken: "anthropic",                displayName: "Anthropic",            description: "AI safety and research" },
+  { boardToken: "vercel",                   displayName: "Vercel",               description: "Frontend cloud platform" },
+  { boardToken: "perplexity",               displayName: "Perplexity",           description: "AI search engine" },
+  { boardToken: "chime",                    displayName: "Chime",               description: "Neobank" },
+  { boardToken: "togetherai",               displayName: "Together AI",          description: "Open-source AI inference" },
+  { boardToken: "sambanovasystems",         displayName: "SambaNova",            description: "AI hardware + platform" },
+
+  // ── Discovered from job_runs:index (Chrome tabs) ──
+  { boardToken: "bitgo",                    displayName: "BitGo",                description: "Crypto custody + infrastructure" },
+  { boardToken: "galaxydigitalservices",    displayName: "Galaxy Digital",       description: "Crypto trading + asset mgmt" },
+  { boardToken: "falconx",                  displayName: "FalconX",              description: "Institutional crypto trading" },
+  { boardToken: "otter",                    displayName: "Otter",                description: "AI meeting notes" },
+  { boardToken: "monstro",                  displayName: "Monstro",              description: "AI platform" },
+  { boardToken: "cherryventures",           displayName: "Cherry Ventures",      description: "VC-backed startup portfolio" },
+
+  // ── Lever companies ──
+  { boardToken: "matchgroup",               displayName: "Match Group",          description: "Dating apps (Tinder, Hinge)", atsType: "lever" },
+  { boardToken: "mistral",                  displayName: "Mistral AI",           description: "Open-weight LLMs",            atsType: "lever" },
+
+  // ── Ashby companies ──
+  { boardToken: "gaiafamily",               displayName: "Gaia Family",          description: "AI fintech",                  atsType: "ashby" },
 ];
