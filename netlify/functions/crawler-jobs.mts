@@ -161,27 +161,59 @@ async function handleGetRuns(redis: any, runsFor: string) {
   return json(runs);
 }
 
-/** PATCH /api/crawler/jobs — body: { board, job_id, status } */
+/**
+ * PATCH /api/crawler/jobs — body: { board, job_id, status }
+ *
+ * Safety: "applied" status is protected and cannot be overwritten by
+ * a status downgrade. To change an applied job, pass force: true.
+ * Status index sets (idx:job_status:*) are kept in sync.
+ */
+const VALID_JOB_STATUSES = ["discovered", "queued", "applied", "rejected", "expired"];
+const PROTECTED_STATUSES = new Set(["applied"]);
+
 async function handlePatchJob(redis: any, req: Request) {
-  const body = await req.json() as { board?: string; job_id?: string; status?: string };
-  const { board, job_id, status } = body;
+  const body = await req.json() as {
+    board?: string; job_id?: string; status?: string; force?: boolean;
+  };
+  const { board, job_id, status, force } = body;
 
   if (!board || !job_id || !status) {
     return json({ error: "Missing board, job_id, or status" }, 400);
   }
 
+  if (!VALID_JOB_STATUSES.includes(status)) {
+    return json({ error: `Invalid status "${status}". Must be one of: ${VALID_JOB_STATUSES.join(", ")}` }, 400);
+  }
+
   const hashKey = `job:${board}:${job_id}`;
-  const exists = await redis.exists(hashKey);
-  if (!exists) {
+  const currentData = await redis.hgetall(hashKey);
+  if (!currentData || !currentData.job_id) {
     return json({ error: `Job ${hashKey} not found` }, 404);
   }
 
-  await redis.hset(hashKey, {
-    status,
-    updated_at: new Date().toISOString(),
-  });
+  const oldStatus = currentData.status;
 
-  return json({ ok: true, board, job_id, status });
+  // Guard: prevent overwriting protected statuses (e.g. "applied") unless forced
+  if (PROTECTED_STATUSES.has(oldStatus) && status !== oldStatus && !force) {
+    return json({
+      error: `Job is "${oldStatus}" — cannot overwrite without force: true`,
+      board, job_id, current_status: oldStatus, requested_status: status,
+    }, 409);
+  }
+
+  const now = new Date().toISOString();
+  const compositeKey = `${board}:${job_id}`;
+
+  // Atomically update status + manage index sets
+  const pipe = redis.pipeline();
+  pipe.hset(hashKey, { status, updated_at: now });
+  if (oldStatus && oldStatus !== status) {
+    pipe.srem(`idx:job_status:${oldStatus}`, compositeKey);
+  }
+  pipe.sadd(`idx:job_status:${status}`, compositeKey);
+  await pipe.exec();
+
+  return json({ ok: true, board, job_id, status, previous_status: oldStatus });
 }
 
 /** POST /api/crawler/jobs — body: { action: "retrieve" } triggers crawl */
